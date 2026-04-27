@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ALL_PRODUCTS, MARKDOWN_LIST, MARKUP_LIST, MATRIX, PRODUCT_DETAILS } from "./data.js";
+import { ALL_PRODUCTS, APPLIED_ACTIONS, MARKDOWN_LIST, MARKUP_LIST, MATRIX, PRODUCT_DETAILS } from "./data.js";
 import { clamp, fmtEUR, fmtIndex, fmtInt, fmtPct, fmtPctFromMult } from "./utils.js";
 
 const recoPalette = {
@@ -14,6 +14,28 @@ const recoPalette = {
 function RecoChip({ value }) {
   const [bg, border, color] = recoPalette[value] || ["rgba(255,255,255,0.06)", "rgba(255,255,255,0.20)", "rgba(234,242,255,0.80)"];
   return <span className="recoChip" style={{ background: bg, borderColor: border, color }}>{value}</span>;
+}
+
+function StatusChip({ value, tone = "neutral" }) {
+  return <span className={`statusChip statusChip--${tone}`}>{value}</span>;
+}
+
+function getProductBySku(sku) {
+  return ALL_PRODUCTS.find((product) => product.sku === sku);
+}
+
+function fmtSignedPct(x) {
+  if (x == null || Number.isNaN(Number(x))) return "-";
+  const sign = Number(x) >= 0 ? "+" : "";
+  return `${sign}${(Number(x) * 100).toFixed(1)}%`;
+}
+
+function statusTone(value) {
+  const normalized = String(value).toLowerCase();
+  if (normalized.includes("effective") || normalized === "low") return "good";
+  if (normalized.includes("watch") || normalized === "medium") return "warn";
+  if (normalized.includes("over") || normalized.includes("follow") || normalized === "high") return "bad";
+  return "neutral";
 }
 
 function computeMatrixStats() {
@@ -44,20 +66,20 @@ function Topbar({ onReset }) {
   );
 }
 
-function Tabs({ activeTab, detailEnabled, onChange }) {
+function Tabs({ activeTab, productDetailEnabled, appliedDetailEnabled, onChange }) {
   const tabs = [
-    ["overview", "Portfolio / Overview"],
-    ["products", "Product List"],
-    ["detail", "Product Detail"],
+    ["overview", "Portfolio / Overview", false],
+    ["products", "Product List", false],
+    ["detail", "Product Detail", !productDetailEnabled],
+    ["applied-detail", "Applied Action Detail", !appliedDetailEnabled],
   ];
   return (
     <nav className="tabs">
-      {tabs.map(([key, label]) => {
-        const disabled = key === "detail" && !detailEnabled;
+      {tabs.map(([key, label, disabled]) => {
         return (
           <button
             key={key}
-            className={`tab ${activeTab === key ? "is-active" : ""} ${key === "detail" ? "tab--detail" : ""}`}
+            className={`tab ${activeTab === key ? "is-active" : ""} ${key.includes("detail") ? "tab--detail" : ""}`}
             aria-disabled={disabled}
             onClick={() => !disabled && onChange(key)}
           >
@@ -157,13 +179,15 @@ function DataTable({ rows, columns, onOpen }) {
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={`${row.type}-${row.sku}`} onClick={() => onOpen(row)}>
+            <tr key={row.id || `${row.type}-${row.sku}`} onClick={() => onOpen?.(row)}>
               {columns.map((col) => {
                 const value = row[col.key];
                 const content = col.render ? col.render(value, row) : value ?? "-";
-                const intensity = col.max ? clamp((Number(value) || 0) / col.max, 0, 1) : undefined;
+                const numericValue = Number(value) || 0;
+                const intensity = col.max ? clamp((col.abs ? Math.abs(numericValue) : numericValue) / col.max, 0, 1) : undefined;
+                const signClass = col.cellClass === "impactCell" ? (numericValue < 0 ? "is-negative" : "is-positive") : "";
                 return (
-                  <td key={col.key} className={`${col.align || ""} ${col.cellClass || ""}`} style={intensity == null ? undefined : { "--i": intensity }}>
+                  <td key={col.key} className={`${col.align || ""} ${col.cellClass || ""} ${signClass}`} style={intensity == null ? undefined : { "--i": intensity }}>
                     {content}
                   </td>
                 );
@@ -176,7 +200,36 @@ function DataTable({ rows, columns, onOpen }) {
   );
 }
 
-function OverviewPage({ onOpen }) {
+function AppliedActionsTable({ onOpen }) {
+  const maxRevenue = Math.max(...APPLIED_ACTIONS.map((row) => Math.abs(row.revenueImpact) || 0), 1);
+  const maxMargin = Math.max(...APPLIED_ACTIONS.map((row) => Math.abs(row.marginImpact) || 0), 1);
+  const rows = APPLIED_ACTIONS.map((action) => {
+    const product = getProductBySku(action.sku);
+    return {
+      ...action,
+      name: product?.name || action.sku,
+      priceMove: `${fmtEUR(action.oldPrice)} -> ${fmtEUR(action.newPrice)}`,
+    };
+  });
+  const columns = [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "action", label: "Applied action", render: (value) => <RecoChip value={value} /> },
+    { key: "appliedDay", label: "Applied day", align: "num", render: (value) => `Day ${value}` },
+    { key: "priceMove", label: "Price move", align: "num" },
+    { key: "rotationDelta", label: "Rotation uplift", align: "num", render: fmtSignedPct },
+    { key: "revenueImpact", label: "Revenue impact", align: "num", render: fmtEUR, cellClass: "impactCell", max: maxRevenue, abs: true },
+    { key: "marginImpact", label: "Margin impact", align: "num", render: fmtEUR, cellClass: "impactCell", max: maxMargin, abs: true },
+    { key: "updatedInventoryForecast", label: "Updated inventory forecast", align: "num", render: fmtPct },
+    { key: "riskStatus", label: "Risk", render: (value) => <StatusChip value={value} tone={statusTone(value)} /> },
+    { key: "outcome", label: "Outcome", render: (value) => <StatusChip value={value} tone={statusTone(value)} /> },
+    { key: "nextAction", label: "Next action" },
+  ];
+
+  return <DataTable rows={rows} columns={columns} onOpen={onOpen} />;
+}
+
+function OverviewPage({ onOpen, onOpenAppliedAction }) {
   const markdownMax = Math.max(...MARKDOWN_LIST.map((r) => r.margin_up || 0), 1);
   const markupMax = Math.max(...MARKUP_LIST.map((r) => r.margin_up || 0), 1);
   const markdownColumns = [
@@ -219,6 +272,13 @@ function OverviewPage({ onOpen }) {
           </div>
         </aside>
       </div>
+      <section className="panel">
+        <div className="panel__head">
+          <div className="panel__title">Applied Actions / Post-mortem</div>
+          <div className="panel__hint">Actions already executed, measured against post-action sales, revenue, margin, and updated inventory risk.</div>
+        </div>
+        <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
+      </section>
       <section className="panel">
         <div className="panel__head"><div className="panel__title">Markdown Actions</div></div>
         <div className="panel__body"><DataTable rows={MARKDOWN_LIST.map((p) => ({ ...p, type: "markdown" }))} columns={markdownColumns} onOpen={onOpen} /></div>
@@ -320,9 +380,49 @@ function createDetailFromProduct(product) {
   };
 }
 
+function enrichDetail(product, detailExtra) {
+  const detail = {
+    sku: product.sku,
+    type: product.type,
+    name: product.name,
+    elasticity: detailExtra.elasticity,
+    curr_price: product.curr,
+    comp_price: product.comp,
+    curr_index_vs_comp: product.pct_comp,
+    scenarioCurrent: detailExtra.scenarioCurrent,
+    defaultScenario: detailExtra.defaultScenario,
+    series: detailExtra.series,
+    scenarios: {},
+  };
+
+  detail.scenarios = Object.fromEntries(
+    Object.entries(detailExtra.scenarios).map(([key, scenario]) => {
+      const isDefault = key === detail.defaultScenario;
+      const price = scenario.price ?? (isDefault ? product.final_price : undefined);
+      const marginUplift = scenario.margin_uplift ?? (isDefault ? product.margin_up : undefined);
+      const proposedIndex = scenario.proposed_index ?? (
+        price != null && product.comp ? (Number(price) - Number(product.comp)) / Number(product.comp) : undefined
+      );
+
+      return [
+        key,
+        {
+          ...scenario,
+          price,
+          margin_uplift: marginUplift,
+          proposed_index: proposedIndex,
+        },
+      ];
+    })
+  );
+
+  return detail;
+}
+
 function getDetailForProduct(product) {
   if (!product) return null;
-  return PRODUCT_DETAILS[product.sku] || createDetailFromProduct(product);
+  const detailExtra = PRODUCT_DETAILS[product.sku];
+  return detailExtra ? enrichDetail(product, detailExtra) : createDetailFromProduct(product);
 }
 
 function InventoryChart({ detail, scenarioKey }) {
@@ -426,6 +526,127 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   );
 }
 
+function AppliedSalesChart({ action }) {
+  const W = 980;
+  const H = 360;
+  const pad = { l: 52, r: 16, t: 14, b: 32 };
+  const allValues = action.timeline.flatMap((point) => ["before", "after", "baseline", "forecast"].map((field) => point[field]).filter((value) => value != null));
+  const maxY = Math.max(125, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
+  const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
+  const toY = (value) => pad.t + (1 - value / maxY) * (H - pad.t - pad.b);
+  const makePath = (field) => action.timeline
+    .filter((point) => point[field] != null && !Number.isNaN(Number(point[field])))
+    .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
+    .join(" ");
+  const xTicks = [0, 30, 60, 90, 120, 150, 180];
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(maxY * ratio));
+  const paths = [
+    ["before", "chartLineBefore"],
+    ["after", "chartLineAfter"],
+    ["baseline", "chartLineBase"],
+    ["forecast", "chartLineForecast"],
+  ].map(([field, className]) => [makePath(field), className]);
+
+  return (
+    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action post-mortem sales chart">
+      {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
+      {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
+      <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
+      <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day</text>
+      {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}</text>)}
+      {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
+      {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
+    </svg>
+  );
+}
+
+function AppliedActionDetailPage({ selectedAction, onBack }) {
+  const action = selectedAction;
+  const product = getProductBySku(action.sku);
+  const rows = [
+    ["Rotation before", fmtPctFromMult(action.preRotation)],
+    ["Rotation after", fmtPctFromMult(action.postRotation)],
+    ["Rotation delta", fmtSignedPct(action.rotationDelta)],
+    ["Revenue impact", fmtEUR(action.revenueImpact)],
+    ["Margin impact", fmtEUR(action.marginImpact)],
+    ["Updated inventory forecast", fmtPct(action.updatedInventoryForecast)],
+    ["Effectiveness score", fmtPct(action.effectiveness)],
+  ];
+
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">Applied Action Detail</div>
+          <div className="panel__hint">Observed post-action performance and recommended next move.</div>
+        </div>
+        <button className="btn btn--ghost" onClick={onBack}>Back to Overview</button>
+      </div>
+      <div className="panel__body">
+        <div className="detailShell">
+          <div className="detailHeaderLarge detailHeaderLarge--kpi">
+            <div className="detailTopBar">
+              <div className="detailTopBarLeft">
+                <button className="detailBackBtn" type="button" onClick={onBack}>Back to overview</button>
+                <div className="detailProductName">{product?.name || action.sku}</div>
+                <div className="appliedMeta">
+                  <StatusChip value={action.outcome} tone={statusTone(action.outcome)} />
+                  <StatusChip value={`Risk: ${action.riskStatus}`} tone={statusTone(action.riskStatus)} />
+                </div>
+              </div>
+              <div className="detailScenarioPill">
+                <div className="detailScenarioPill__label">Applied</div>
+                <div className="appliedActionName">{action.action}</div>
+              </div>
+            </div>
+            <div className="detailHeroStats">
+              <HeroStat label="SKU" value={action.sku} sub={`Applied day: ${action.appliedDay}`} />
+              <div className="heroDivider" />
+              <HeroStat label="Price move" value={`${fmtEUR(action.oldPrice)} -> ${fmtEUR(action.newPrice)}`} />
+              <div className="heroDivider" />
+              <HeroStat label="Rotation delta" value={fmtSignedPct(action.rotationDelta)} sub={`${fmtPctFromMult(action.preRotation)} to ${fmtPctFromMult(action.postRotation)}`} blue={action.rotationDelta >= 0} />
+              <div className="heroDivider" />
+              <HeroStat label="Next action" value={action.nextAction} purple={statusTone(action.outcome) !== "good"} />
+            </div>
+          </div>
+          <div className="detailGrid2">
+            <div className="detailCard">
+              <div className="detailCardHead">
+                <div className="detailCardTitle">Sales Response <span className="muted">(indexed units, days 0-180)</span></div>
+              </div>
+              <div className="detailCardBody">
+                <AppliedSalesChart action={action} />
+                <div className="chartLegend">
+                  <div className="legendItem"><span className="legendSwatch before" />Before action</div>
+                  <div className="legendItem"><span className="legendSwatch after" />Observed after action</div>
+                  <div className="legendItem"><span className="legendSwatch base" />No-action continuation</div>
+                  <div className="legendItem"><span className="legendSwatch forecast" />Updated forecast</div>
+                </div>
+              </div>
+            </div>
+            <div className="detailCard">
+              <div className="detailCardHead"><div className="detailCardTitle">Pre / Post Metrics</div></div>
+              <div className="detailCardBody">
+                <table className="detailTbl">
+                  <tbody>{rows.map(([label, value]) => <tr key={label}><th>{label}</th><td className="num">{value}</td></tr>)}</tbody>
+                </table>
+                <div className="insightBlock">
+                  <div className="insightBlock__label">Insight</div>
+                  <div className="insightBlock__text">{action.insight}</div>
+                </div>
+                <div className="detailKpiRow">
+                  <div className="detailKpiLabel">Recommended next move</div>
+                  <div className="detailKpiVal">{action.nextAction}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function HeroStat({ label, value, sub, purple, blue }) {
   return (
     <div className="heroStat">
@@ -441,6 +662,7 @@ export default function App() {
   const [category, setCategory] = useState("");
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedAppliedAction, setSelectedAppliedAction] = useState(null);
   const [scenarioKey, setScenarioKey] = useState("md10");
 
   function openProduct(product) {
@@ -450,22 +672,29 @@ export default function App() {
     setActiveTab("detail");
   }
 
+  function openAppliedAction(action) {
+    setSelectedAppliedAction(action);
+    setActiveTab("applied-detail");
+  }
+
   function reset() {
     setActiveTab("overview");
     setCategory("");
     setSearch("");
     setSelectedProduct(null);
+    setSelectedAppliedAction(null);
     setScenarioKey("md10");
   }
 
   return (
     <div className="app">
       <Topbar onReset={reset} />
-      <Tabs activeTab={activeTab} detailEnabled={Boolean(selectedProduct)} onChange={setActiveTab} />
+      <Tabs activeTab={activeTab} productDetailEnabled={Boolean(selectedProduct)} appliedDetailEnabled={Boolean(selectedAppliedAction)} onChange={setActiveTab} />
       <main className="content">
-        {activeTab === "overview" && <OverviewPage onOpen={openProduct} />}
+        {activeTab === "overview" && <OverviewPage onOpen={openProduct} onOpenAppliedAction={openAppliedAction} />}
         {activeTab === "products" && <ProductListPage category={category} search={search} onCategoryChange={setCategory} onSearchChange={setSearch} onOpen={openProduct} />}
         {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
+        {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab("overview")} />}
       </main>
     </div>
   );
