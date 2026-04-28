@@ -146,6 +146,76 @@ select {
   box-shadow: inset 3px 0 0 rgba(66, 217, 200, 0.95);
 }
 
+.sidebar__group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar__group.is-active > .sidebar__item--parent {
+  color: #fff;
+  background: rgba(66, 217, 200, 0.1);
+  border-color: rgba(66, 217, 200, 0.18);
+}
+
+.sidebar__item--parent {
+  padding-right: 9px;
+}
+
+.sidebar__item--parent > span:nth-child(2) {
+  flex: 1;
+}
+
+.sidebar__disclosure {
+  width: 7px;
+  height: 7px;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  opacity: 0.6;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.sidebar__disclosure.is-open {
+  transform: rotate(45deg);
+  opacity: 0.86;
+}
+
+.sidebar__submenu {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-left: 26px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar__subitem {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(234, 242, 255, 0.58);
+  min-height: 30px;
+  padding: 7px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 750;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.sidebar__subitem:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.sidebar__subitem.is-active {
+  color: #fff;
+  background: rgba(66, 217, 200, 0.13);
+  border-color: rgba(66, 217, 200, 0.18);
+}
+
 .sidebar__icon {
   width: 16px;
   height: 16px;
@@ -195,6 +265,30 @@ select {
   border: 1.7px solid currentColor;
   border-radius: 2px;
   background: #081428;
+}
+
+.sidebar__icon--recommendations::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  height: 9px;
+  border-left: 1.7px solid currentColor;
+  border-bottom: 1.7px solid currentColor;
+  border-radius: 1px;
+}
+
+.sidebar__icon--recommendations::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 8px;
+  height: 6px;
+  border-left: 1.8px solid currentColor;
+  border-top: 1.8px solid currentColor;
+  transform: skew(-18deg) rotate(135deg);
 }
 
 .sidebar__icon--applied::before {
@@ -392,6 +486,97 @@ select {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin: 0 6px 12px;
+}
+
+.dashboardHealthPanel {
+  margin-bottom: 12px;
+}
+
+.dashboardHealthPanel__body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+}
+
+.healthBlock {
+  padding: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(6, 19, 37, 0.34);
+}
+
+.healthBlock__title {
+  margin-bottom: 11px;
+  color: rgba(234, 242, 255, 0.76);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.metricBar + .metricBar {
+  margin-top: 11px;
+}
+
+.metricBar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(234, 242, 255, 0.9);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.metricBar__head strong {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 950;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.metricBar__track {
+  height: 7px;
+  margin-top: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.metricBar__fill {
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: rgba(234, 242, 255, 0.48);
+}
+
+.metricBar__fill--good,
+.metricBar__fill--low,
+.metricBar__fill--markdown {
+  background: linear-gradient(90deg, #42d9c8, #7aa2ff);
+}
+
+.metricBar__fill--warn,
+.metricBar__fill--medium {
+  background: linear-gradient(90deg, #f4b84a, #ffcf6d);
+}
+
+.metricBar__fill--bad,
+.metricBar__fill--high {
+  background: linear-gradient(90deg, #ff7070, #ff9a7a);
+}
+
+.metricBar__fill--markup {
+  background: linear-gradient(90deg, #7aa2ff, #9f7cff);
+}
+
+.metricBar__detail {
+  margin-top: 5px;
+  color: rgba(234, 242, 255, 0.52);
+  font-size: 11.5px;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
 .card {
@@ -765,6 +950,22 @@ select {
   color: rgba(234, 242, 255, 0.82);
 }
 
+.categoryChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 162, 255, 0.26);
+  background: rgba(122, 162, 255, 0.08);
+  color: rgba(234, 242, 255, 0.88);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
 .priceMove {
   display: inline-flex;
   flex-direction: column;
@@ -875,13 +1076,15 @@ select {
   border: 1px solid var(--border2);
   background: rgba(6, 19, 37, 0.55);
   color: var(--text);
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 12px;
   outline: none;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .select {
-  min-width: 180px;
+  min-width: 158px;
 }
 
 .input {
@@ -1373,6 +1576,10 @@ select {
     grid-template-columns: 1fr;
   }
 
+  .dashboardHealthPanel__body {
+    grid-template-columns: 1fr;
+  }
+
   .kpi-row {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1402,6 +1609,21 @@ select {
 
   .sidebar__item {
     width: auto;
+    min-width: 140px;
+  }
+
+  .sidebar__group {
+    flex: 0 0 auto;
+    min-width: 170px;
+  }
+
+  .sidebar__submenu {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: none;
+  }
+
+  .sidebar__subitem {
     min-width: 140px;
   }
 

@@ -12,6 +12,7 @@ const recoPalette = {
 };
 
 const scenarioColors = ["#42d9c8", "#9f7cff", "#f4b84a", "#ff7aa2"];
+const CATEGORY_OPTIONS = ["Clothing", "Footwear", "Accessories"];
 
 function getScenarioColor(index) {
   return scenarioColors[index % scenarioColors.length];
@@ -31,6 +32,10 @@ function StatusChip({ value, tone = "neutral" }) {
   return <span className={`statusChip statusChip--${tone}`}>{value}</span>;
 }
 
+function CategoryChip({ value }) {
+  return <span className="categoryChip">{value || "-"}</span>;
+}
+
 function getProductBySku(sku) {
   return ALL_PRODUCTS.find((product) => product.sku === sku);
 }
@@ -48,6 +53,16 @@ function fmtEURWhole(x) {
     currency: "EUR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
+  });
+}
+
+function fmtCompactEUR(x) {
+  if (x == null || Number.isNaN(Number(x))) return "-";
+  return Number(x).toLocaleString("en-US", {
+    style: "currency",
+    currency: "EUR",
+    notation: "compact",
+    maximumFractionDigits: 1,
   });
 }
 
@@ -130,22 +145,114 @@ function computeMatrixStats() {
   const muRequired = muRowIdxs.reduce((s, ri) => s + (Number(values[ri][zeroColIdx]) || 0), 0);
   const mdApplied = mdColIdxs.reduce((s, ci) => s + values.reduce((ss, row) => ss + (Number(row[ci]) || 0), 0), 0);
   const muApplied = muColIdxs.reduce((s, ci) => s + values.reduce((ss, row) => ss + (Number(row[ci]) || 0), 0), 0);
+  const mdActionsNeeded = mdRowIdxs.reduce((sum, ri) => sum + values[ri].reduce((rowSum, value, ci) => rowSum + (ri === ci ? 0 : Number(value) || 0), 0), 0);
+  const muActionsNeeded = muRowIdxs.reduce((sum, ri) => sum + values[ri].reduce((rowSum, value, ci) => rowSum + (ri === ci ? 0 : Number(value) || 0), 0), 0);
   const inventoryAtRisk = Math.round(mdRequired * 27.5 * 70);
   const marginUpside = Math.round(inventoryAtRisk * 0.238);
-  return { mdRequired, muRequired, mdApplied, muApplied, inventoryAtRisk, marginUpside };
+  return { mdRequired, muRequired, mdApplied, muApplied, mdActionsNeeded, muActionsNeeded, inventoryAtRisk, marginUpside };
+}
+
+function sumBy(rows, getter) {
+  return rows.reduce((sum, row) => sum + (Number(getter(row)) || 0), 0);
+}
+
+function avgNumbers(values) {
+  const valid = values.filter((value) => value != null && !Number.isNaN(Number(value)));
+  if (!valid.length) return null;
+  return valid.reduce((sum, value) => sum + Number(value), 0) / valid.length;
+}
+
+function timelinePoint(action, day) {
+  return action.timeline.find((point) => point.d === day);
+}
+
+function getDashboardMetrics() {
+  const matrixStats = computeMatrixStats();
+  const recommendations = [...MARKDOWN_LIST, ...MARKUP_LIST];
+  const appliedRevenue = sumBy(APPLIED_ACTIONS, (action) => action.revenueImpact);
+  const appliedMargin = sumBy(APPLIED_ACTIONS, (action) => action.marginImpact);
+  const expectedRevenue = sumBy(recommendations, (product) => product.rev_uplift);
+  const expectedMargin = sumBy(recommendations, (product) => product.margin_up);
+  const successfulActions = APPLIED_ACTIONS.filter((action) => Number(action.effectiveness) >= 0.65).length;
+  const successRate = APPLIED_ACTIONS.length ? successfulActions / APPLIED_ACTIONS.length : 0;
+  const remainingToday = avgNumbers(APPLIED_ACTIONS.map((action) => timelinePoint(action, 60)?.actual));
+  const sellThrough = remainingToday == null ? null : 1 - remainingToday / 100;
+  const noChangeEnd = avgNumbers(APPLIED_ACTIONS.map((action) => timelinePoint(action, 180)?.noChange));
+  const recommendedEnd = avgNumbers(APPLIED_ACTIONS.map((action) => {
+    const point = timelinePoint(action, 180);
+    return point?.recommended ?? point?.noChange;
+  }));
+  const currentAboveCompetitor = ALL_PRODUCTS.filter((product) => Number(product.pct_comp) > 0).length;
+  const avgPriceIndex = avgNumbers(ALL_PRODUCTS.map((product) => product.pct_comp)) ?? 0;
+  const recommendationUpsideTotal = 463648;
+  const actionsNeededTotal = matrixStats.mdActionsNeeded + matrixStats.muActionsNeeded;
+  const markdownUpside = actionsNeededTotal ? Math.round(recommendationUpsideTotal * (matrixStats.mdActionsNeeded / actionsNeededTotal)) : 0;
+  const markupUpside = recommendationUpsideTotal - markdownUpside;
+  const appliedActionTotal = matrixStats.mdApplied + matrixStats.muApplied;
+  const highRiskApplied = Math.round(appliedActionTotal * 0.0335);
+  const mediumRiskApplied = Math.round(appliedActionTotal * 0.1216);
+  const lowRiskApplied = appliedActionTotal - highRiskApplied - mediumRiskApplied;
+  const riskRows = [
+    { label: "High", count: highRiskApplied, tone: "high" },
+    { label: "Medium", count: mediumRiskApplied, tone: "medium" },
+    { label: "Low", count: lowRiskApplied, tone: "low" },
+  ];
+  const recommendationMix = [
+    {
+      label: "Markdown",
+      count: matrixStats.mdActionsNeeded,
+      margin: markdownUpside,
+      tone: "markdown",
+    },
+    {
+      label: "Markup",
+      count: matrixStats.muActionsNeeded,
+      margin: markupUpside,
+      tone: "markup",
+    },
+  ];
+
+  return {
+    matrixStats,
+    appliedRevenue,
+    appliedMargin,
+    expectedRevenue,
+    expectedMargin,
+    successfulActions,
+    successRate,
+    remainingToday,
+    sellThrough,
+    noChangeEnd,
+    recommendedEnd,
+    currentAboveCompetitor,
+    avgPriceIndex,
+    riskRows,
+    recommendationMix,
+    totalApplied: appliedActionTotal,
+    totalRecommendations: recommendations.length,
+  };
 }
 
 function Sidebar({ activeTab, onNavigate }) {
+  const [openGroups, setOpenGroups] = useState({ recommendations: true, applied: true });
   const activeSection = activeTab === "products" || activeTab === "detail"
     ? "products"
-    : activeTab === "applied-actions" || activeTab === "applied-detail"
+    : activeTab.startsWith("applied") || activeTab === "applied-detail"
       ? "applied-actions"
+      : activeTab.startsWith("recommendations")
+        ? "recommendations"
       : "overview";
-  const items = [
-    ["overview", "Dashboard", "dashboard"],
-    ["products", "Product List", "products"],
-    ["applied-actions", "Applied Actions", "applied"],
+  const recommendationTabs = [
+    ["recommendations-markdown", "Markdowns"],
+    ["recommendations-markup", "Markups"],
   ];
+  const appliedTabs = [
+    ["applied-markdown", "Markdowns"],
+    ["applied-markup", "Markups"],
+  ];
+  function toggleGroup(group) {
+    setOpenGroups((current) => ({ ...current, [group]: !current[group] }));
+  }
 
   return (
     <aside className="sidebar" aria-label="Primary navigation">
@@ -158,17 +265,68 @@ function Sidebar({ activeTab, onNavigate }) {
         <div className="sidebar__chevron" aria-hidden="true" />
       </div>
       <nav className="sidebar__nav">
-        {items.map(([key, label, icon]) => (
+        <button
+          className={`sidebar__item ${activeSection === "overview" ? "is-active" : ""}`}
+          type="button"
+          onClick={() => onNavigate("overview")}
+        >
+          <span className="sidebar__icon sidebar__icon--dashboard" />
+          <span>Dashboard</span>
+        </button>
+        <div className={`sidebar__group ${activeSection === "recommendations" ? "is-active" : ""}`}>
           <button
-            className={`sidebar__item ${activeSection === key ? "is-active" : ""}`}
-            key={key}
+            className="sidebar__item sidebar__item--parent"
             type="button"
-            onClick={() => onNavigate(key)}
+            onClick={() => {
+              toggleGroup("recommendations");
+              onNavigate("recommendations");
+            }}
           >
-            <span className={`sidebar__icon sidebar__icon--${icon}`} />
-            <span>{label}</span>
+            <span className="sidebar__icon sidebar__icon--recommendations" />
+            <span>Recommendations</span>
+            <span className={`sidebar__disclosure ${openGroups.recommendations ? "is-open" : ""}`} />
           </button>
-        ))}
+          {openGroups.recommendations && (
+            <div className="sidebar__submenu">
+              {recommendationTabs.map(([key, label]) => (
+                <button className={`sidebar__subitem ${activeTab === key ? "is-active" : ""}`} key={key} type="button" onClick={() => onNavigate(key)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className={`sidebar__group ${activeSection === "applied-actions" ? "is-active" : ""}`}>
+          <button
+            className="sidebar__item sidebar__item--parent"
+            type="button"
+            onClick={() => {
+              toggleGroup("applied");
+              onNavigate("applied-actions");
+            }}
+          >
+            <span className="sidebar__icon sidebar__icon--applied" />
+            <span>Applied Actions</span>
+            <span className={`sidebar__disclosure ${openGroups.applied ? "is-open" : ""}`} />
+          </button>
+          {openGroups.applied && (
+            <div className="sidebar__submenu">
+              {appliedTabs.map(([key, label]) => (
+                <button className={`sidebar__subitem ${activeTab === key ? "is-active" : ""}`} key={key} type="button" onClick={() => onNavigate(key)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          className={`sidebar__item ${activeSection === "products" ? "is-active" : ""}`}
+          type="button"
+          onClick={() => onNavigate("products")}
+        >
+          <span className="sidebar__icon sidebar__icon--products" />
+          <span>Products</span>
+        </button>
       </nav>
       <div className="sidebar__brand">
         <div className="sidebar__powered">Powered by</div>
@@ -184,8 +342,13 @@ function Sidebar({ activeTab, onNavigate }) {
 function PageHeader({ activeTab }) {
   const titles = {
     overview: "Dashboard",
-    products: "Product List",
+    products: "Products",
+    recommendations: "Recommendations",
+    "recommendations-markdown": "Markdown Recommendations",
+    "recommendations-markup": "Markup Recommendations",
     "applied-actions": "Applied Actions",
+    "applied-markdown": "Applied Markdowns",
+    "applied-markup": "Applied Markups",
     detail: "Product Detail",
     "applied-detail": "Applied Action Detail",
   };
@@ -279,6 +442,73 @@ function ImpactTiles() {
   );
 }
 
+function MetricBar({ label, value, detail, ratio, tone = "neutral" }) {
+  return (
+    <div className="metricBar">
+      <div className="metricBar__head">
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+      <div className="metricBar__track">
+        <div className={`metricBar__fill metricBar__fill--${tone}`} style={{ width: `${clamp(ratio, 0, 1) * 100}%` }} />
+      </div>
+      <div className="metricBar__detail">{detail}</div>
+    </div>
+  );
+}
+
+function PortfolioHealthPanel({ metrics }) {
+  const maxRisk = Math.max(...metrics.riskRows.map((row) => row.count), 1);
+  const maxMargin = Math.max(...metrics.recommendationMix.map((row) => row.margin), 1);
+
+  return (
+    <section className="panel dashboardHealthPanel">
+      <div className="panel__head">
+        <div className="panel__title">Risk and action mix</div>
+      </div>
+      <div className="panel__body dashboardHealthPanel__body">
+        <div className="healthBlock">
+          <div className="healthBlock__title">Recommendation upside</div>
+          {metrics.recommendationMix.map((row) => (
+            <MetricBar
+              key={row.label}
+              label={row.label}
+              value={fmtEURWhole(row.margin)}
+              detail={`${fmtInt(row.count)} actions recommended at week 9`}
+              ratio={row.margin / maxMargin}
+              tone={row.tone}
+            />
+          ))}
+        </div>
+        <div className="healthBlock">
+          <div className="healthBlock__title">Applied action risk</div>
+          {metrics.riskRows.map((row) => (
+            <MetricBar
+              key={row.label}
+              label={row.label}
+              value={fmtInt(row.count)}
+              detail={`${fmtPct(row.count / metrics.totalApplied)} of applied actions`}
+              ratio={row.count / maxRisk}
+              tone={row.tone}
+            />
+          ))}
+        </div>
+        <div className="healthBlock">
+          <div className="healthBlock__title">End-season inventory forecast</div>
+          <MetricBar label="No further change" value={fmtPct((metrics.noChangeEnd || 0) / 100)} detail="average remaining stock" ratio={(metrics.noChangeEnd || 0) / 100} tone="warn" />
+          <MetricBar label="With next actions" value={fmtPct((metrics.recommendedEnd || 0) / 100)} detail="after recommended follow-ups" ratio={(metrics.recommendedEnd || 0) / 100} tone="good" />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DashboardRiskSummary() {
+  const metrics = getDashboardMetrics();
+
+  return <PortfolioHealthPanel metrics={metrics} />;
+}
+
 function DataTable({ rows, columns, onOpen }) {
   return (
     <div className="table-wrap">
@@ -309,21 +539,28 @@ function DataTable({ rows, columns, onOpen }) {
   );
 }
 
-function AppliedActionsTable({ onOpen }) {
-  const maxRevenue = Math.max(...APPLIED_ACTIONS.map((row) => Math.abs(row.revenueImpact) || 0), 1);
-  const maxMargin = Math.max(...APPLIED_ACTIONS.map((row) => Math.abs(row.marginImpact) || 0), 1);
+function AppliedActionsTable({ onOpen, type = "", categoryFilter = "", showCategory = true }) {
   const rows = APPLIED_ACTIONS.map((action) => {
     const product = getProductBySku(action.sku);
     return {
       ...action,
       name: product?.name || action.sku,
+      category: product?.category || "-",
       competitorPrice: product?.comp,
       priceVsCompetitor: product?.comp ? (Number(action.newPrice) - Number(product.comp)) / Number(product.comp) : null,
     };
+  }).filter((action) => {
+    if (type && action.type !== type) return false;
+    if (categoryFilter && action.category !== categoryFilter) return false;
+    return true;
   });
+  const maxRevenue = Math.max(...rows.map((row) => Math.abs(row.revenueImpact) || 0), 1);
+  const maxMargin = Math.max(...rows.map((row) => Math.abs(row.marginImpact) || 0), 1);
+  const categoryColumn = showCategory ? [{ key: "category", label: "Category", render: (value) => <CategoryChip value={value} /> }] : [];
   const columns = [
     { key: "name", label: "Name" },
     { key: "sku", label: "SKU" },
+    ...categoryColumn,
     { key: "action", label: "Applied action", render: (value) => <RecoChip value={value} /> },
     { key: "appliedDay", label: "Applied day", align: "num", render: (value) => `Day ${value}` },
     { key: "priceVsCompetitor", label: "Price vs competitor", align: "num", render: (value) => (value == null ? "-" : fmtSignedPct(value)) },
@@ -339,34 +576,119 @@ function AppliedActionsTable({ onOpen }) {
   return <DataTable rows={rows} columns={columns} onOpen={onOpen} />;
 }
 
-function OverviewPage({ onOpen, onOpenAppliedAction }) {
-  const markdownMax = Math.max(...MARKDOWN_LIST.map((r) => r.margin_up || 0), 1);
-  const markupMax = Math.max(...MARKUP_LIST.map((r) => r.margin_up || 0), 1);
-  const markdownColumns = [
+function getRecommendationRows(type) {
+  if (type === "markdown") {
+    return [...MARKDOWN_LIST]
+      .sort((a, b) => (Number(b.margin_up) || 0) - (Number(a.margin_up) || 0))
+      .map((product) => ({ ...product, type: "markdown" }));
+  }
+  if (type === "markup") {
+    return [...MARKUP_LIST]
+      .sort((a, b) => (Number(b.margin_up) || 0) - (Number(a.margin_up) || 0))
+      .map((product) => ({ ...product, type: "markup" }));
+  }
+  return [];
+}
+
+function getRecommendationColumns(type, rows, showCategory = true) {
+  const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
+  const categoryColumn = showCategory ? [{ key: "category", label: "Category", render: (value) => <CategoryChip value={value} /> }] : [];
+  if (type === "markdown") {
+    return [
+      { key: "name", label: "Name" }, { key: "sku", label: "SKU" },
+      ...categoryColumn,
+      { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
+      { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
+      { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
+      { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: Math.max(...rows.map((row) => row.inv_risk_pct || 0), 1) },
+      { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
+      { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
+      { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
+      { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
+    ];
+  }
+  return [
     { key: "name", label: "Name" }, { key: "sku", label: "SKU" },
-    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
-    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
-    { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
-    { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: Math.max(...MARKDOWN_LIST.map((r) => r.inv_risk_pct || 0), 1) },
-    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
-    { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
-    { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
-    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: markdownMax },
-  ];
-  const markupColumns = [
-    { key: "name", label: "Name" }, { key: "sku", label: "SKU" },
+    ...categoryColumn,
     { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
     { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
     { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
     { key: "rot", label: "Rotation vs Forecast", align: "num", render: fmtPctFromMult },
     { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
-    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: markupMax },
+    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
   ];
+}
 
+function RecommendationTableSection({ type, onOpen, title, hint, showCategory = true, showCategoryFilter = true }) {
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const rows = getRecommendationRows(type).filter((row) => !categoryFilter || row.category === categoryFilter);
+  const columns = getRecommendationColumns(type, rows, showCategory);
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">{title}</div>
+          {hint && <div className="panel__hint">{hint}</div>}
+        </div>
+        {showCategoryFilter && (
+          <div className="filters">
+            <select className="select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+              <option value="">All categories</option>
+              {CATEGORY_OPTIONS.map((category) => <option value={category} key={category}>{category}</option>)}
+            </select>
+          </div>
+        )}
+      </div>
+      <div className="panel__body"><DataTable rows={rows} columns={columns} onOpen={onOpen} /></div>
+    </section>
+  );
+}
+
+function RecommendationsPage({ type = "", onOpen }) {
+  if (type === "markdown") {
+    return (
+      <RecommendationTableSection
+        type="markdown"
+        onOpen={onOpen}
+        title="Markdown Recommendations"
+        hint="Priority markdown actions ranked by expected margin impact and inventory risk."
+      />
+    );
+  }
+  if (type === "markup") {
+    return (
+      <RecommendationTableSection
+        type="markup"
+        onOpen={onOpen}
+        title="Markup Recommendations"
+        hint="Priority markup actions ranked by expected margin upside."
+      />
+    );
+  }
+  return (
+    <>
+      <RecommendationTableSection
+        type="markdown"
+        onOpen={onOpen}
+        title="Markdown Recommendations"
+        hint="Priority markdown actions ranked by expected margin impact and inventory risk."
+      />
+      <RecommendationTableSection
+        type="markup"
+        onOpen={onOpen}
+        title="Markup Recommendations"
+        hint="Priority markup actions ranked by expected margin upside."
+      />
+    </>
+  );
+}
+
+function OverviewPage({ onOpen, onOpenAppliedAction }) {
   return (
     <>
       <KpiRow />
+      <DashboardRiskSummary />
       <div className="mid">
         <section className="panel">
           <div className="panel__head">
@@ -387,41 +709,64 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
           <div className="panel__title">Applied Actions</div>
           <div className="panel__hint">Actions already executed, measured against post-action sales, revenue, margin, and updated inventory risk.</div>
         </div>
-        <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
+        <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} showCategory={false} /></div>
       </section>
-      <section className="panel">
-        <div className="panel__head"><div className="panel__title">Markdown Actions</div></div>
-        <div className="panel__body"><DataTable rows={MARKDOWN_LIST.map((p) => ({ ...p, type: "markdown" }))} columns={markdownColumns} onOpen={onOpen} /></div>
-      </section>
-      <section className="panel">
-        <div className="panel__head"><div className="panel__title">Markup Opportunities</div></div>
-        <div className="panel__body"><DataTable rows={MARKUP_LIST.map((p) => ({ ...p, type: "markup" }))} columns={markupColumns} onOpen={onOpen} /></div>
-      </section>
+      <RecommendationTableSection
+        type="markdown"
+        onOpen={onOpen}
+        title="Top Markdown Actions"
+        hint="Highest-priority markdowns ranked by expected margin impact and inventory risk."
+        showCategory={false}
+        showCategoryFilter={false}
+      />
+      <RecommendationTableSection
+        type="markup"
+        onOpen={onOpen}
+        title="Top Markup Actions"
+        hint="Highest-priority markups ranked by expected margin upside."
+        showCategory={false}
+        showCategoryFilter={false}
+      />
     </>
   );
 }
 
-function AppliedActionsPage({ onOpenAppliedAction }) {
+function AppliedActionsPage({ onOpenAppliedAction, type = "" }) {
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const title = type === "markdown" ? "Applied Markdowns" : type === "markup" ? "Applied Markups" : "Applied Actions";
+  const hint = type
+    ? `Executed ${type === "markdown" ? "markdowns" : "markups"}, measured against rotation, revenue, margin, and updated inventory risk.`
+    : "Executed markdowns and markups, measured against rotation, revenue, margin, and updated inventory risk.";
   return (
     <section className="panel">
-      <div className="panel__head">
-        <div className="panel__title">Applied Actions</div>
-        <div className="panel__hint">Executed markdowns and markups, measured against rotation, revenue, margin, and updated inventory risk.</div>
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">{title}</div>
+          <div className="panel__hint">{hint}</div>
+        </div>
+        <div className="filters">
+          <select className="select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+            <option value="">All categories</option>
+            {CATEGORY_OPTIONS.map((category) => <option value={category} key={category}>{category}</option>)}
+          </select>
+        </div>
       </div>
-      <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
+      <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} type={type} categoryFilter={categoryFilter} /></div>
     </section>
   );
 }
 
-function ProductListPage({ category, search, onCategoryChange, onSearchChange, onOpen }) {
+function ProductListPage({ typeFilter, categoryFilter, search, onTypeChange, onCategoryChange, onSearchChange, onOpen }) {
   const filtered = useMemo(() => ALL_PRODUCTS.filter((row) => {
-    if (category && row.type !== category) return false;
+    if (typeFilter && row.type !== typeFilter) return false;
+    if (categoryFilter && row.category !== categoryFilter) return false;
     if (!search) return true;
-    return `${row.sku} ${row.name}`.toLowerCase().includes(search.toLowerCase());
-  }), [category, search]);
+    return `${row.sku} ${row.name} ${row.category}`.toLowerCase().includes(search.toLowerCase());
+  }), [typeFilter, categoryFilter, search]);
   const marginMax = Math.max(...filtered.map((r) => Number(r.margin_up) || 0), 1);
   const columns = [
     { key: "sku", label: "SKU" }, { key: "name", label: "Name" },
+    { key: "category", label: "Category", render: (value) => <CategoryChip value={value} /> },
     { key: "type", label: "Type", render: (v) => <span className="pill"><span className="dot" />{v}</span> },
     { key: "reco", label: "Recommendation", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "curr", label: "Current price (EUR)", align: "num", render: fmtEUR },
@@ -436,10 +781,14 @@ function ProductListPage({ category, search, onCategoryChange, onSearchChange, o
           <div className="panel__hint">Click any row to open Product Detail.</div>
         </div>
         <div className="filters">
-          <select className="select" value={category} onChange={(event) => onCategoryChange(event.target.value)}>
+          <select className="select" value={typeFilter} onChange={(event) => onTypeChange(event.target.value)}>
             <option value="">All types</option>
             <option value="markup">Markup</option>
             <option value="markdown">Markdown</option>
+          </select>
+          <select className="select" value={categoryFilter} onChange={(event) => onCategoryChange(event.target.value)}>
+            <option value="">All categories</option>
+            {CATEGORY_OPTIONS.map((category) => <option value={category} key={category}>{category}</option>)}
           </select>
           <input className="input" type="search" placeholder="Search SKU / name..." value={search} onChange={(event) => onSearchChange(event.target.value)} />
         </div>
@@ -854,7 +1203,8 @@ function HeroStat({ label, value, sub, purple, blue, tone, color }) {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("overview");
-  const [category, setCategory] = useState("");
+  const [typeFilter, setTypeFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedAppliedAction, setSelectedAppliedAction] = useState(null);
@@ -879,8 +1229,13 @@ export default function App() {
         <PageHeader activeTab={activeTab} />
         <main className="content">
           {activeTab === "overview" && <OverviewPage onOpen={openProduct} onOpenAppliedAction={openAppliedAction} />}
-          {activeTab === "products" && <ProductListPage category={category} search={search} onCategoryChange={setCategory} onSearchChange={setSearch} onOpen={openProduct} />}
+          {activeTab === "recommendations" && <RecommendationsPage onOpen={openProduct} />}
+          {activeTab === "recommendations-markdown" && <RecommendationsPage type="markdown" onOpen={openProduct} />}
+          {activeTab === "recommendations-markup" && <RecommendationsPage type="markup" onOpen={openProduct} />}
+          {activeTab === "products" && <ProductListPage typeFilter={typeFilter} categoryFilter={categoryFilter} search={search} onTypeChange={setTypeFilter} onCategoryChange={setCategoryFilter} onSearchChange={setSearch} onOpen={openProduct} />}
           {activeTab === "applied-actions" && <AppliedActionsPage onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "applied-markdown" && <AppliedActionsPage type="markdown" onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "applied-markup" && <AppliedActionsPage type="markup" onOpenAppliedAction={openAppliedAction} />}
           {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
           {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab("applied-actions")} />}
         </main>
