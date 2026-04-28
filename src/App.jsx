@@ -54,40 +54,68 @@ function computeMatrixStats() {
   return { mdRequired, muRequired, mdApplied, muApplied, inventoryAtRisk, marginUpside };
 }
 
-function Topbar({ onReset }) {
+function Sidebar({ activeTab, onNavigate }) {
+  const activeSection = activeTab === "products" || activeTab === "detail"
+    ? "products"
+    : activeTab === "applied-actions" || activeTab === "applied-detail"
+      ? "applied-actions"
+      : "overview";
+  const items = [
+    ["overview", "Dashboard", "dashboard"],
+    ["products", "Product List", "products"],
+    ["applied-actions", "Applied Actions", "applied"],
+  ];
+
   return (
-    <header className="topbar">
-      <div>
-        <div className="title">Portfolio Overview</div>
-        <div className="subtitle">Recommended actions based on demand, elasticity, and inventory signals &middot; As of day 60</div>
+    <aside className="sidebar" aria-label="Primary navigation">
+      <div className="sidebar__profile">
+        <div className="sidebar__avatar" aria-hidden="true" />
+        <div className="sidebar__user">
+          <div className="sidebar__name">Name</div>
+          <div className="sidebar__role">Pricing Admin</div>
+        </div>
+        <div className="sidebar__chevron" aria-hidden="true" />
       </div>
-      <button className="btn" onClick={onReset}>Reset</button>
-    </header>
+      <nav className="sidebar__nav">
+        {items.map(([key, label, icon]) => (
+          <button
+            className={`sidebar__item ${activeSection === key ? "is-active" : ""}`}
+            key={key}
+            type="button"
+            onClick={() => onNavigate(key)}
+          >
+            <span className={`sidebar__icon sidebar__icon--${icon}`} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
+      <div className="sidebar__brand">
+        <div className="sidebar__powered">Powered by</div>
+        <div className="sidebar__brandRow">
+          <div className="sidebar__brandMark" aria-hidden="true" />
+          <div className="sidebar__brandName">SK</div>
+        </div>
+      </div>
+    </aside>
   );
 }
 
-function Tabs({ activeTab, productDetailEnabled, appliedDetailEnabled, onChange }) {
-  const tabs = [
-    ["overview", "Portfolio / Overview", false],
-    ["products", "Product List", false],
-    ["detail", "Product Detail", !productDetailEnabled],
-    ["applied-detail", "Applied Action Detail", !appliedDetailEnabled],
-  ];
+function PageHeader({ activeTab }) {
+  const titles = {
+    overview: "Dashboard",
+    products: "Product List",
+    "applied-actions": "Applied Actions",
+    detail: "Product Detail",
+    "applied-detail": "Applied Action Detail",
+  };
+
   return (
-    <nav className="tabs">
-      {tabs.map(([key, label, disabled]) => {
-        return (
-          <button
-            key={key}
-            className={`tab ${activeTab === key ? "is-active" : ""} ${key.includes("detail") ? "tab--detail" : ""}`}
-            aria-disabled={disabled}
-            onClick={() => !disabled && onChange(key)}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </nav>
+    <header className="pageHeader">
+      <div>
+        <h1>{titles[activeTab] || "Dashboard"}</h1>
+        <p>Recommended actions based on demand, elasticity, and inventory signals - As of day 60</p>
+      </div>
+    </header>
   );
 }
 
@@ -288,6 +316,18 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
         <div className="panel__body"><DataTable rows={MARKUP_LIST.map((p) => ({ ...p, type: "markup" }))} columns={markupColumns} onOpen={onOpen} /></div>
       </section>
     </>
+  );
+}
+
+function AppliedActionsPage({ onOpenAppliedAction }) {
+  return (
+    <section className="panel">
+      <div className="panel__head">
+        <div className="panel__title">Applied Actions / Post-mortem</div>
+        <div className="panel__hint">Executed markdowns and markups, measured against rotation, revenue, margin, and updated inventory risk.</div>
+      </div>
+      <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
+    </section>
   );
 }
 
@@ -530,8 +570,10 @@ function AppliedSalesChart({ action }) {
   const W = 980;
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
-  const allValues = action.timeline.flatMap((point) => ["before", "after", "baseline", "forecast"].map((field) => point[field]).filter((value) => value != null));
-  const maxY = Math.max(125, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
+  const currentDay = 60;
+  const fields = ["actual", "noAction", "noChange", "recommended"];
+  const allValues = action.timeline.flatMap((point) => fields.map((field) => point[field]).filter((value) => value != null));
+  const maxY = Math.max(100, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / maxY) * (H - pad.t - pad.b);
   const makePath = (field) => action.timeline
@@ -539,21 +581,23 @@ function AppliedSalesChart({ action }) {
     .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
     .join(" ");
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => Math.round(maxY * ratio));
+  const yTicks = [0, 25, 50, 75, 100];
   const paths = [
-    ["before", "chartLineBefore"],
-    ["after", "chartLineAfter"],
-    ["baseline", "chartLineBase"],
-    ["forecast", "chartLineForecast"],
+    ["actual", "chartLineActual"],
+    ["noAction", "chartLineNoAction"],
+    ["noChange", "chartLineNoChange"],
+    ["recommended", "chartLineRecommended"],
   ].map(([field, className]) => [makePath(field), className]);
 
   return (
-    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action post-mortem sales chart">
+    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action post-mortem inventory chart">
       {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
-      <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day</text>
-      {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}</text>)}
+      <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
+      <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
+      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day 60</text>
+      {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
     </svg>
@@ -563,6 +607,7 @@ function AppliedSalesChart({ action }) {
 function AppliedActionDetailPage({ selectedAction, onBack }) {
   const action = selectedAction;
   const product = getProductBySku(action.sku);
+  const hasRecommendedPath = action.timeline.some((point) => point.recommended != null);
   const rows = [
     ["Rotation before", fmtPctFromMult(action.preRotation)],
     ["Rotation after", fmtPctFromMult(action.postRotation)],
@@ -612,15 +657,15 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
           <div className="detailGrid2">
             <div className="detailCard">
               <div className="detailCardHead">
-                <div className="detailCardTitle">Sales Response <span className="muted">(indexed units, days 0-180)</span></div>
+                <div className="detailCardTitle">Inventory Response <span className="muted">(% remaining, days 0-180)</span></div>
               </div>
               <div className="detailCardBody">
                 <AppliedSalesChart action={action} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch before" />Before action</div>
-                  <div className="legendItem"><span className="legendSwatch after" />Observed after action</div>
-                  <div className="legendItem"><span className="legendSwatch base" />No-action continuation</div>
-                  <div className="legendItem"><span className="legendSwatch forecast" />Updated forecast</div>
+                  <div className="legendItem"><span className="legendSwatch actual" />Observed until today</div>
+                  <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
+                  <div className="legendItem"><span className="legendSwatch noChange" />No further change forecast</div>
+                  {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch recommended" />Recommended action forecast</div>}
                 </div>
               </div>
             </div>
@@ -677,25 +722,19 @@ export default function App() {
     setActiveTab("applied-detail");
   }
 
-  function reset() {
-    setActiveTab("overview");
-    setCategory("");
-    setSearch("");
-    setSelectedProduct(null);
-    setSelectedAppliedAction(null);
-    setScenarioKey("md10");
-  }
-
   return (
-    <div className="app">
-      <Topbar onReset={reset} />
-      <Tabs activeTab={activeTab} productDetailEnabled={Boolean(selectedProduct)} appliedDetailEnabled={Boolean(selectedAppliedAction)} onChange={setActiveTab} />
-      <main className="content">
-        {activeTab === "overview" && <OverviewPage onOpen={openProduct} onOpenAppliedAction={openAppliedAction} />}
-        {activeTab === "products" && <ProductListPage category={category} search={search} onCategoryChange={setCategory} onSearchChange={setSearch} onOpen={openProduct} />}
-        {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
-        {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab("overview")} />}
-      </main>
+    <div className="appShell">
+      <Sidebar activeTab={activeTab} onNavigate={setActiveTab} />
+      <div className="mainShell">
+        <PageHeader activeTab={activeTab} />
+        <main className="content">
+          {activeTab === "overview" && <OverviewPage onOpen={openProduct} onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "products" && <ProductListPage category={category} search={search} onCategoryChange={setCategory} onSearchChange={setSearch} onOpen={openProduct} />}
+          {activeTab === "applied-actions" && <AppliedActionsPage onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
+          {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab("applied-actions")} />}
+        </main>
+      </div>
     </div>
   );
 }
