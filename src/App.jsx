@@ -127,7 +127,7 @@ function PriceMove({ oldPrice, newPrice, competitorPrice, variant = "table" }) {
       </div>
       {competitorIndex != null && (
         <div className={`priceMove__competitor priceMove__competitor--${tone}`}>
-          vs competitor {fmtSignedPct(competitorIndex)} - {competitorIndexLabel(competitorIndex)}
+          New price is {fmtSignedPct(competitorIndex)} vs competitor price
         </div>
       )}
     </div>
@@ -389,37 +389,94 @@ function TransitionMatrix() {
   const { cols, rows, values } = MATRIX;
   const rowTotals = values.map((row) => row.reduce((s, v) => s + (Number(v) || 0), 0));
   const colTotals = cols.map((_, ci) => values.reduce((s, row) => s + (Number(row[ci]) || 0), 0));
-  const maxVal = Math.max(...values.flat().map((v) => Number(v) || 0), 1);
+  const offDiagonalValues = values.flatMap((row, ri) => row.map((value, ci) => (ri === ci ? 0 : Number(value) || 0))).filter((value) => value > 0);
+  const heatMax = Math.max(...offDiagonalValues, 1);
+  function mixColor(a, b, t) {
+    const r = Math.round(a[0] + (b[0] - a[0]) * t);
+    const g = Math.round(a[1] + (b[1] - a[1]) * t);
+    const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+    return [r, g, bl];
+  }
+  function policyBandStyle(label) {
+    const pct = parseInt(label, 10);
+    const neutral = [190, 198, 207];
+    const markdown = [122, 162, 255];
+    const markup = [66, 217, 200];
+    const tone = pct < 0
+      ? mixColor(neutral, markdown, Math.min(Math.abs(pct) / 60, 1))
+      : mixColor(neutral, markup, Math.min(pct / 60, 1));
+    const glow = pct < 0 ? "rgba(122, 162, 255, 0.20)" : pct > 0 ? "rgba(66, 217, 200, 0.20)" : "rgba(234, 242, 255, 0.14)";
+    return {
+      "--policy-bg": `linear-gradient(180deg, rgba(${tone[0]}, ${tone[1]}, ${tone[2]}, 0.92), rgba(${tone[0]}, ${tone[1]}, ${tone[2]}, 0.70))`,
+      "--policy-glow": glow,
+    };
+  }
   return (
-    <div className="table-wrap">
-      <table className="matrix">
-        <thead>
-          <tr>
-            <th className="rowhdr">Proposed</th>
-            {cols.map((col) => <th key={col}><span className={`band ${col === "0%" ? "bandZero" : parseInt(col, 10) < 0 ? "bandDown" : "bandUp"}`}>{col}</span></th>)}
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, ri) => (
-            <tr key={row}>
-              <th className="rowhdr"><span className={`band ${row === "0%" ? "bandZero" : parseInt(row, 10) < 0 ? "bandDown" : "bandUp"}`}>{row}</span></th>
-              {values[ri].map((value, ci) => {
-                const n = Number(value) || 0;
-                const alpha = row === "0%" && cols[ci] === "0%" ? 0 : clamp(n / maxVal, 0, 1);
-                return <td key={cols[ci]} style={{ "--heat": alpha }}>{n > 0 ? fmtInt(n) : ""}</td>;
-              })}
-              <td className="totalCell">{fmtInt(rowTotals[ri])}</td>
+    <>
+      <div className="table-wrap">
+        <table className="matrix">
+          <thead>
+            <tr>
+              <th className="matrix__axisCorner" colSpan="2" />
+              <th className="matrix__superHeader" colSpan={cols.length}>Current policy</th>
+              <th className="matrix__totalHeader">Total</th>
             </tr>
-          ))}
-          <tr>
-            <th className="rowhdr">Total</th>
-            {colTotals.map((total, i) => <td className="totalCell" key={cols[i]}>{total > 0 ? fmtInt(total) : ""}</td>)}
-            <td />
-          </tr>
-        </tbody>
-      </table>
-    </div>
+            <tr>
+              <th className="matrix__axisSpacer" />
+              <th className="rowhdr matrix__rowAxisLabel" />
+              {cols.map((col, index) => (
+                <th key={col}>
+                  <span className={`band band--policy ${index === 0 ? "band--first" : ""} ${index === cols.length - 1 ? "band--last" : ""}`} style={policyBandStyle(col)}>{col}</span>
+                </th>
+              ))}
+              <th className="matrix__totalHeader" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={row}>
+                {ri === 0 && (
+                  <th className="matrix__yAxis" rowSpan={rows.length + 1}>
+                    <span>Proposed policy</span>
+                  </th>
+                )}
+                <th className="rowhdr">
+                  <span className={`band band--policy ${ri === 0 ? "band--top" : ""} ${ri === rows.length - 1 ? "band--bottom" : ""}`} style={policyBandStyle(row)}>{row}</span>
+                </th>
+                {values[ri].map((value, ci) => {
+                  const n = Number(value) || 0;
+                  const rowPct = parseInt(row, 10);
+                  const isDiagonal = ri === ci;
+                  const isZero = n === 0;
+                  const alpha = isZero ? 0 : isDiagonal ? 0.18 : clamp(Math.log1p(n) / Math.log1p(heatMax), 0.08, 1);
+                  const actionClass = isDiagonal ? "matrixCell--diagonal" : rowPct < 0 ? "matrixCell--markdown" : rowPct > 0 ? "matrixCell--markup" : "matrixCell--neutral";
+                  return (
+                    <td
+                      className={`matrixCell ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""}`}
+                      key={cols[ci]}
+                      style={{ "--heat": alpha }}
+                    >
+                      {n > 0 ? fmtInt(n) : ""}
+                    </td>
+                  );
+                })}
+                <td className="totalCell">{fmtInt(rowTotals[ri])}</td>
+              </tr>
+            ))}
+            <tr>
+              <th className="rowhdr">Total</th>
+              {colTotals.map((total, i) => <td className="totalCell" key={cols[i]}>{total > 0 ? fmtInt(total) : ""}</td>)}
+              <td />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="matrixLegend" aria-label="Transition matrix legend">
+        <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--diagonal" />Aligned policy</div>
+        <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--action" />Action required</div>
+        <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--heat" />Darker cell means higher SKU count</div>
+      </div>
+    </>
   );
 }
 
