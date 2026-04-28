@@ -11,8 +11,19 @@ const recoPalette = {
   "Mark-up +30%": ["rgba(168,85,247,0.15)", "rgba(168,85,247,0.50)", "#d8b4fe"],
 };
 
-function RecoChip({ value }) {
-  const [bg, border, color] = recoPalette[value] || ["rgba(255,255,255,0.06)", "rgba(255,255,255,0.20)", "rgba(234,242,255,0.80)"];
+const scenarioColors = ["#42d9c8", "#9f7cff", "#f4b84a", "#ff7aa2"];
+
+function getScenarioColor(index) {
+  return scenarioColors[index % scenarioColors.length];
+}
+
+function RecoChip({ value, colorKey = value }) {
+  const fallback = String(value).startsWith("Markdown")
+    ? ["rgba(20,184,166,0.15)", "rgba(20,184,166,0.50)", "#5eead4"]
+    : String(value).startsWith("Mark-up")
+      ? ["rgba(168,85,247,0.15)", "rgba(168,85,247,0.50)", "#d8b4fe"]
+      : ["rgba(255,255,255,0.06)", "rgba(255,255,255,0.20)", "rgba(234,242,255,0.80)"];
+  const [bg, border, color] = recoPalette[colorKey] || recoPalette[value] || fallback;
   return <span className="recoChip" style={{ background: bg, borderColor: border, color }}>{value}</span>;
 }
 
@@ -30,12 +41,82 @@ function fmtSignedPct(x) {
   return `${sign}${(Number(x) * 100).toFixed(1)}%`;
 }
 
+function fmtEURWhole(x) {
+  if (x == null || Number.isNaN(Number(x))) return "-";
+  return Number(x).toLocaleString("en-US", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+function formatActionPct(x) {
+  if (x == null || Number.isNaN(Number(x))) return null;
+  const sign = Number(x) >= 0 ? "+" : "";
+  return `${sign}${(Number(x) * 100).toFixed(1)}%`;
+}
+
+function getExactActionLabel(product) {
+  const exactPct = formatActionPct(product.exact_action_pct);
+  if (!exactPct) return product.reco;
+  return `${product.type === "markup" ? "Mark-up" : "Markdown"} ${exactPct}`;
+}
+
+function getCompactScenarioLabel(label) {
+  return String(label)
+    .replace(/\s*\(Recommended\)\s*/i, "")
+    .replace(/^Markdown\s+/i, "")
+    .replace(/^Mark-up\s+/i, "");
+}
+
+function RecoChipForProduct({ product }) {
+  return <RecoChip value={getExactActionLabel(product)} colorKey={product.reco} />;
+}
+
+function actionTone(type) {
+  return type === "markup" ? "markup" : "markdown";
+}
+
 function statusTone(value) {
   const normalized = String(value).toLowerCase();
   if (normalized.includes("effective") || normalized === "low") return "good";
   if (normalized.includes("watch") || normalized === "medium") return "warn";
   if (normalized.includes("over") || normalized.includes("follow") || normalized === "high") return "bad";
   return "neutral";
+}
+
+function competitorIndexTone(index) {
+  if (index <= -0.05) return "good";
+  if (index <= 0) return "warn";
+  return "bad";
+}
+
+function competitorIndexLabel(index) {
+  if (index <= -0.05) return "target";
+  if (index <= 0) return "below target";
+  return "above competitor";
+}
+
+function PriceMove({ oldPrice, newPrice, competitorPrice, variant = "table" }) {
+  const competitorIndex = competitorPrice ? (Number(newPrice) - Number(competitorPrice)) / Number(competitorPrice) : null;
+  const tone = competitorIndex == null ? "neutral" : competitorIndexTone(competitorIndex);
+  const direction = Number(newPrice) >= Number(oldPrice) ? "up" : "down";
+
+  return (
+    <div className={`priceMove priceMove--${variant}`}>
+      <div className="priceMove__row">
+        <span>{fmtEUR(oldPrice)}</span>
+        <span className={`priceMove__arrow priceMove__arrow--${direction}`} aria-hidden="true" />
+        <span>{fmtEUR(newPrice)}</span>
+      </div>
+      {competitorIndex != null && (
+        <div className={`priceMove__competitor priceMove__competitor--${tone}`}>
+          vs competitor {fmtSignedPct(competitorIndex)} - {competitorIndexLabel(competitorIndex)}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function computeMatrixStats() {
@@ -113,7 +194,7 @@ function PageHeader({ activeTab }) {
     <header className="pageHeader">
       <div>
         <h1>{titles[activeTab] || "Dashboard"}</h1>
-        <p>Recommended actions based on demand, elasticity, and inventory signals - As of day 60</p>
+        <p>Current season day 60</p>
       </div>
     </header>
   );
@@ -236,7 +317,8 @@ function AppliedActionsTable({ onOpen }) {
     return {
       ...action,
       name: product?.name || action.sku,
-      priceMove: `${fmtEUR(action.oldPrice)} -> ${fmtEUR(action.newPrice)}`,
+      competitorPrice: product?.comp,
+      priceVsCompetitor: product?.comp ? (Number(action.newPrice) - Number(product.comp)) / Number(product.comp) : null,
     };
   });
   const columns = [
@@ -244,7 +326,7 @@ function AppliedActionsTable({ onOpen }) {
     { key: "sku", label: "SKU" },
     { key: "action", label: "Applied action", render: (value) => <RecoChip value={value} /> },
     { key: "appliedDay", label: "Applied day", align: "num", render: (value) => `Day ${value}` },
-    { key: "priceMove", label: "Price move", align: "num" },
+    { key: "priceVsCompetitor", label: "Price vs competitor", align: "num", render: (value) => (value == null ? "-" : fmtSignedPct(value)) },
     { key: "rotationDelta", label: "Rotation uplift", align: "num", render: fmtSignedPct },
     { key: "revenueImpact", label: "Revenue impact", align: "num", render: fmtEUR, cellClass: "impactCell", max: maxRevenue, abs: true },
     { key: "marginImpact", label: "Margin impact", align: "num", render: fmtEUR, cellClass: "impactCell", max: maxMargin, abs: true },
@@ -266,7 +348,7 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
     { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
     { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
     { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: Math.max(...MARKDOWN_LIST.map((r) => r.inv_risk_pct || 0), 1) },
-    { key: "reco", label: "Policy", render: (v) => <RecoChip value={v} /> },
+    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
     { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
     { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: markdownMax },
@@ -277,7 +359,7 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
     { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
     { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
     { key: "rot", label: "Rotation vs Forecast", align: "num", render: fmtPctFromMult },
-    { key: "reco", label: "Policy", render: (v) => <RecoChip value={v} /> },
+    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
     { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: markupMax },
   ];
@@ -302,7 +384,7 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
       </div>
       <section className="panel">
         <div className="panel__head">
-          <div className="panel__title">Applied Actions / Post-mortem</div>
+          <div className="panel__title">Applied Actions</div>
           <div className="panel__hint">Actions already executed, measured against post-action sales, revenue, margin, and updated inventory risk.</div>
         </div>
         <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
@@ -323,7 +405,7 @@ function AppliedActionsPage({ onOpenAppliedAction }) {
   return (
     <section className="panel">
       <div className="panel__head">
-        <div className="panel__title">Applied Actions / Post-mortem</div>
+        <div className="panel__title">Applied Actions</div>
         <div className="panel__hint">Executed markdowns and markups, measured against rotation, revenue, margin, and updated inventory risk.</div>
       </div>
       <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} /></div>
@@ -341,7 +423,7 @@ function ProductListPage({ category, search, onCategoryChange, onSearchChange, o
   const columns = [
     { key: "sku", label: "SKU" }, { key: "name", label: "Name" },
     { key: "type", label: "Type", render: (v) => <span className="pill"><span className="dot" />{v}</span> },
-    { key: "reco", label: "Recommendation", render: (v) => <RecoChip value={v} /> },
+    { key: "reco", label: "Recommendation", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "curr", label: "Current price (EUR)", align: "num", render: fmtEUR },
     { key: "final_price", label: "Final price (EUR)", align: "num", render: fmtEUR },
     { key: "margin_up", label: "Margin upside (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
@@ -397,7 +479,7 @@ function createDetailFromProduct(product) {
     defaultScenario: scenarioKey,
     scenarios: {
       [scenarioKey]: {
-        label: `${product.reco} (Recommended)`,
+        label: `${getExactActionLabel(product)} (Recommended)`,
         price: product.final_price,
         inv_units: isMarkup ? Math.round(currentRevenue * 0.002) : 0,
         inv_eur: isMarkup ? Math.round(currentRevenue * 0.002 * Number(product.final_price || 0)) : 0,
@@ -443,11 +525,13 @@ function enrichDetail(product, detailExtra) {
       const proposedIndex = scenario.proposed_index ?? (
         price != null && product.comp ? (Number(price) - Number(product.comp)) / Number(product.comp) : undefined
       );
+      const label = isDefault ? `${getExactActionLabel(product)} (Recommended)` : scenario.label;
 
       return [
         key,
         {
           ...scenario,
+          label,
           price,
           margin_uplift: marginUplift,
           proposed_index: proposedIndex,
@@ -465,18 +549,34 @@ function getDetailForProduct(product) {
   return detailExtra ? enrichDetail(product, detailExtra) : createDetailFromProduct(product);
 }
 
-function InventoryChart({ detail, scenarioKey }) {
+function InventoryChart({ detail, scenarioKey, scenarioEntries, onScenarioChange }) {
   const W = 980;
   const H = 360;
-  const pad = { l: 52, r: 16, t: 14, b: 32 };
+  const pad = { l: 38, r: 12, t: 14, b: 32 };
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / 100) * (H - pad.t - pad.b);
-  const makePath = (field) => detail.series
-    .filter((point) => point[field] != null && !Number.isNaN(Number(point[field])))
-    .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
-    .join(" ");
+  function makePath(field, includePoint) {
+    const points = [];
+    for (const point of detail.series) {
+      if (!includePoint(point)) continue;
+      const value = point[field];
+      if (value == null || Number.isNaN(Number(value))) continue;
+      points.push(point);
+      if (Number(value) <= 0) break;
+    }
+    return points
+      .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
+      .join(" ");
+  }
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const yTicks = [0, 25, 50, 75, 100];
+  const pPre = makePath("cur", (point) => point.d <= 60);
+  const pNoChange = makePath("cur", (point) => point.d >= 60);
+  const scenarioPaths = scenarioEntries.map(([key], index) => ({
+    key,
+    color: getScenarioColor(index),
+    path: makePath(key, (point) => point.d >= 60),
+  }));
 
   return (
     <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
@@ -486,8 +586,17 @@ function InventoryChart({ detail, scenarioKey }) {
       <text x={toX(60) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day 60</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
-      <path className="chartLineCur" d={makePath("cur")} />
-      <path className="chartLineSel" d={makePath(scenarioKey)} />
+      {pPre && <path className="chartLineProductPre" d={pPre} />}
+      {pNoChange && <path className="chartLineProductNoChange" d={pNoChange} />}
+      {scenarioPaths.map(({ key, color, path }) => path ? (
+        <path
+          className={`chartLineProductScenario ${key === scenarioKey ? "is-active" : ""}`}
+          d={path}
+          key={key}
+          onClick={() => onScenarioChange(key)}
+          style={{ "--scenario-color": color }}
+        />
+      ) : null)}
     </svg>
   );
 }
@@ -496,19 +605,24 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const detail = getDetailForProduct(selectedProduct);
   const selectedKey = detail.scenarios[scenarioKey] ? scenarioKey : detail.defaultScenario;
   const scenario = detail.scenarios[selectedKey];
+  const scenarioEntries = Object.entries(detail.scenarios);
+  const selectedScenarioIndex = Math.max(0, scenarioEntries.findIndex(([key]) => key === selectedKey));
+  const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
+  const scenarioColumnWidth = `${66 / (scenarioEntries.length + 1)}%`;
   const rows = [
-    ["Obsolete inv. (units)", fmtInt(detail.scenarioCurrent.inv_units), fmtInt(scenario.inv_units)],
-    ["Obsolete inv. (EUR)", fmtEUR(detail.scenarioCurrent.inv_eur), fmtEUR(scenario.inv_eur)],
-    ["Revenue (EUR)", fmtEUR(detail.scenarioCurrent.revenue), fmtEUR(scenario.revenue)],
-    ["Cost (EUR)", fmtEUR(detail.scenarioCurrent.cost), fmtEUR(scenario.cost)],
-    ["Margin (EUR)", fmtEUR(detail.scenarioCurrent.margin), fmtEUR(scenario.margin)],
+    { label: "Obsolete inv. (units)", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
+    { label: "Obsolete inv. (EUR)", current: fmtEURWhole(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtEURWhole(s.inv_eur) },
+    { label: "Revenue (EUR)", current: fmtEURWhole(detail.scenarioCurrent.revenue), getValue: (s) => fmtEURWhole(s.revenue) },
+    { label: "Cost (EUR)", current: fmtEURWhole(detail.scenarioCurrent.cost), getValue: (s) => fmtEURWhole(s.cost) },
+    { label: "Margin (EUR)", current: fmtEURWhole(detail.scenarioCurrent.margin), getValue: (s) => fmtEURWhole(s.margin) },
+    { label: "Incremental margin", current: "-", getValue: (s) => fmtEURWhole(s.margin_uplift) },
   ];
 
   return (
     <section className="panel">
       <div className="panel__head panel__head--split">
         <div><div className="panel__title">Product Detail</div></div>
-        <button className="btn btn--ghost" onClick={onBack}>Back to Product List</button>
+        <button className="btn btn--ghost btn--compact" onClick={onBack}>Back to Product List</button>
       </div>
       <div className="panel__body">
         <div className="detailShell">
@@ -532,27 +646,63 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
               <div className="heroDivider" />
               <HeroStat label="Current price vs competitor" value={fmtIndex(detail.curr_index_vs_comp)} sub={`Competitor price: ${fmtEUR(detail.comp_price)}`} />
               <div className="heroDivider" />
-              <HeroStat label="Proposed price vs competitor" value={fmtIndex(scenario.proposed_index)} sub={`Proposed price: ${fmtEUR(scenario.price)}`} blue />
+              <HeroStat label="Proposed price vs competitor" value={fmtIndex(scenario.proposed_index)} sub={`Proposed price: ${fmtEUR(scenario.price)}`} color={selectedScenarioColor} />
             </div>
           </div>
           <div className="detailGrid2">
             <div className="detailCard">
               <div className="detailCardHead"><div className="detailCardTitle">Inventory Evolution <span className="muted">(% remaining, days 0-180)</span></div></div>
               <div className="detailCardBody">
-                <InventoryChart detail={detail} scenarioKey={selectedKey} />
+                <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioEntries={scenarioEntries} onScenarioChange={onScenarioChange} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch cur" />Current scenario</div>
-                  <div className="legendItem"><span className="legendSwatch sel" />{scenario.label}</div>
+                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day 60</div>
+                  <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
+                  {scenarioEntries.map(([key, value], index) => (
+                    <button
+                      className={`legendItem legendButton ${key === selectedKey ? "is-active" : ""}`}
+                      key={key}
+                      type="button"
+                      onClick={() => onScenarioChange(key)}
+                    >
+                      <span className="legendSwatch productScenario" style={{ "--scenario-color": getScenarioColor(index) }} />
+                      {value.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
             <div className="detailCard">
               <div className="detailCardHead"><div className="detailCardTitle">Scenario Comparison - End of Season</div></div>
               <div className="detailCardBody">
-                <table className="detailTbl">
-                  <thead><tr><th>Metric</th><th className="num">Current</th><th className="num">{scenario.label}</th></tr></thead>
-                  <tbody>{rows.map(([label, current, selected]) => <tr key={label}><th>{label}</th><td className="num">{current}</td><td className="num">{selected}</td></tr>)}</tbody>
-                </table>
+                <div className="table-wrap">
+                  <table className="detailTbl detailTbl--wide">
+                    <colgroup>
+                      <col style={{ width: "34%" }} />
+                      <col style={{ width: scenarioColumnWidth }} />
+                      {scenarioEntries.map(([key]) => <col key={key} style={{ width: scenarioColumnWidth }} />)}
+                    </colgroup>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th className="num">Current</th>
+                        {scenarioEntries.map(([key, value]) => (
+                          <th className={`num ${key === selectedKey ? "is-selectedScenario" : ""}`} key={key} title={value.label}>
+                            {getCompactScenarioLabel(value.label)}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row) => (
+                        <tr key={row.label}>
+                          <th>{row.label}</th>
+                          <td className="num">{row.current}</td>
+                          {scenarioEntries.map(([key, value]) => <td className={`num ${key === selectedKey ? "is-selectedScenario" : ""}`} key={key}>{row.getValue(value)}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <div className="detailKpiRow">
                   <div className="detailKpiLabel">Incremental margin</div>
                   <div className="detailKpiVal" style={{ color: scenario.margin_uplift >= 0 ? "var(--accent)" : "#FF7070" }}>{fmtEUR(scenario.margin_uplift)}</div>
@@ -590,7 +740,7 @@ function AppliedSalesChart({ action }) {
   ].map(([field, className]) => [makePath(field), className]);
 
   return (
-    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action post-mortem inventory chart">
+    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
       {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
@@ -625,7 +775,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
           <div className="panel__title">Applied Action Detail</div>
           <div className="panel__hint">Observed post-action performance and recommended next move.</div>
         </div>
-        <button className="btn btn--ghost" onClick={onBack}>Back to Overview</button>
+        <button className="btn btn--ghost btn--compact" onClick={onBack}>Back to Overview</button>
       </div>
       <div className="panel__body">
         <div className="detailShell">
@@ -647,7 +797,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
             <div className="detailHeroStats">
               <HeroStat label="SKU" value={action.sku} sub={`Applied day: ${action.appliedDay}`} />
               <div className="heroDivider" />
-              <HeroStat label="Price move" value={`${fmtEUR(action.oldPrice)} -> ${fmtEUR(action.newPrice)}`} />
+              <HeroStat label="Price move" value={<PriceMove oldPrice={action.oldPrice} newPrice={action.newPrice} competitorPrice={product?.comp} variant="hero" />} />
               <div className="heroDivider" />
               <HeroStat label="Rotation delta" value={fmtSignedPct(action.rotationDelta)} sub={`${fmtPctFromMult(action.preRotation)} to ${fmtPctFromMult(action.postRotation)}`} blue={action.rotationDelta >= 0} />
               <div className="heroDivider" />
@@ -692,11 +842,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   );
 }
 
-function HeroStat({ label, value, sub, purple, blue }) {
+function HeroStat({ label, value, sub, purple, blue, tone, color }) {
   return (
     <div className="heroStat">
       <div className="heroStat__label">{label}</div>
-      <div className={`heroStat__big ${purple ? "heroStat__big--purple" : ""}`} style={blue ? { color: "#7aa2ff" } : undefined}>{value}</div>
+      <div className={`heroStat__big ${purple ? "heroStat__big--purple" : ""} ${tone ? `heroStat__big--${tone}` : ""}`} style={color ? { color } : blue ? { color: "#7aa2ff" } : undefined}>{value}</div>
       {sub && <div className="heroStat__sub">{sub}</div>}
     </div>
   );

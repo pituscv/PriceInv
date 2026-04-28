@@ -344,6 +344,14 @@ select {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.btn--compact {
+  padding: 7px 9px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 750;
+  box-shadow: none;
+}
+
 .tabs {
   display: flex;
   gap: 10px;
@@ -757,6 +765,104 @@ select {
   color: rgba(234, 242, 255, 0.82);
 }
 
+.priceMove {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  min-width: 146px;
+}
+
+.priceMove__row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: rgba(234, 242, 255, 0.94);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.priceMove__arrow {
+  width: 28px;
+  height: 16px;
+  position: relative;
+  flex: 0 0 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.priceMove__arrow::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 7px;
+  width: 12px;
+  height: 1.6px;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.priceMove__arrow::after {
+  content: "";
+  position: absolute;
+  right: 7px;
+  top: 5px;
+  width: 5px;
+  height: 5px;
+  border-right: 1.7px solid currentColor;
+  border-top: 1.7px solid currentColor;
+  transform: rotate(45deg);
+}
+
+.priceMove__arrow--up {
+  color: #7aa2ff;
+}
+
+.priceMove__arrow--down {
+  color: var(--accent);
+}
+
+.priceMove__competitor {
+  font-size: 10.5px;
+  font-weight: 850;
+  line-height: 1.2;
+  letter-spacing: 0.15px;
+  white-space: nowrap;
+}
+
+.priceMove__competitor--good {
+  color: #7ff1e6;
+}
+
+.priceMove__competitor--warn {
+  color: #fde68a;
+}
+
+.priceMove__competitor--bad {
+  color: #ffaaaa;
+}
+
+.priceMove__competitor--neutral {
+  color: rgba(234, 242, 255, 0.62);
+}
+
+.priceMove--hero {
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.priceMove--hero .priceMove__row {
+  font-size: 18px;
+  white-space: normal;
+}
+
+.priceMove--hero .priceMove__competitor {
+  font-size: 12px;
+}
+
 .filters {
   display: flex;
   align-items: center;
@@ -904,6 +1010,14 @@ select {
   color: #9f7cff;
 }
 
+.heroStat__big--markdown {
+  color: #42d9c8;
+}
+
+.heroStat__big--markup {
+  color: #9f7cff;
+}
+
 .heroStat__sub {
   font-size: 14px;
   line-height: 1.25;
@@ -948,7 +1062,7 @@ select {
 
 .detailGrid2 {
   display: grid;
-  grid-template-columns: 1.6fr 1fr;
+  grid-template-columns: minmax(650px, 1.28fr) minmax(560px, 1fr);
   gap: 12px;
   align-items: stretch;
   margin-top: 12px;
@@ -1010,6 +1124,42 @@ select {
   fill: none;
 }
 
+.chartLineProductPre {
+  stroke: rgba(122, 162, 255, 0.95);
+  stroke-width: 3;
+  fill: none;
+}
+
+.chartLineProductNoChange {
+  stroke: rgba(122, 162, 255, 0.95);
+  stroke-width: 2.5;
+  fill: none;
+  stroke-dasharray: 8 5;
+}
+
+.chartLineProductAction {
+  stroke: rgba(66, 217, 200, 0.98);
+  stroke-width: 3.25;
+  fill: none;
+  stroke-dasharray: 8 5;
+}
+
+.chartLineProductScenario {
+  stroke: var(--scenario-color);
+  stroke-width: 2.35;
+  fill: none;
+  stroke-dasharray: 8 5;
+  opacity: 0.58;
+  cursor: pointer;
+  transition: opacity 0.12s ease, stroke-width 0.12s ease;
+}
+
+.chartLineProductScenario:hover,
+.chartLineProductScenario.is-active {
+  opacity: 1;
+  stroke-width: 3.6;
+}
+
 .chartLineBefore,
 .chartLineActual {
   stroke: rgba(234, 242, 255, 0.72);
@@ -1060,6 +1210,21 @@ select {
   color: rgba(234, 242, 255, 0.86);
 }
 
+.legendButton {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 3px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.legendButton:hover,
+.legendButton.is-active {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.045);
+}
+
 .legendSwatch {
   width: 26px;
   height: 4px;
@@ -1072,6 +1237,25 @@ select {
 
 .legendSwatch.sel {
   background: rgba(66, 217, 200, 0.95);
+}
+
+.legendSwatch.productPre {
+  background: rgba(122, 162, 255, 0.95);
+}
+
+.legendSwatch.productNoChange {
+  background: repeating-linear-gradient(90deg, rgba(122, 162, 255, 0.95) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(122, 162, 255, 0.28);
+}
+
+.legendSwatch.productAction {
+  background: repeating-linear-gradient(90deg, rgba(66, 217, 200, 0.98) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(66, 217, 200, 0.26);
+}
+
+.legendSwatch.productScenario {
+  background: repeating-linear-gradient(90deg, var(--scenario-color) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--scenario-color) 40%, transparent);
 }
 
 .legendSwatch.before,
@@ -1105,11 +1289,17 @@ select {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.detailTbl--wide {
+  min-width: 620px;
+  table-layout: fixed;
+}
+
 .detailTbl th,
 .detailTbl td {
   padding: 10px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
 
 .detailTbl th {
@@ -1122,6 +1312,12 @@ select {
 .detailTbl td {
   color: rgba(234, 242, 255, 0.92);
   background: rgba(14, 34, 60, 0.18);
+}
+
+.detailTbl .is-selectedScenario {
+  color: #fff;
+  background: rgba(66, 217, 200, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(66, 217, 200, 0.16);
 }
 
 .detailTbl tr:last-child th,
