@@ -499,71 +499,89 @@ function ImpactTiles() {
   );
 }
 
-function MetricBar({ label, value, detail, ratio, tone = "neutral" }) {
-  return (
-    <div className="metricBar">
-      <div className="metricBar__head">
-        <span>{label}</span>
-        <strong>{value}</strong>
-      </div>
-      <div className="metricBar__track">
-        <div className={`metricBar__fill metricBar__fill--${tone}`} style={{ width: `${clamp(ratio, 0, 1) * 100}%` }} />
-      </div>
-      <div className="metricBar__detail">{detail}</div>
-    </div>
-  );
+const PRICING_ACTION_SUMMARY = [
+  {
+    action: "Markup",
+    tone: "markup",
+    applied: { skus: "826", rot: "-3%", rev: "€328,399", margin: "4.55", iar: "€73,770" },
+    proposed: { skus: "792", rot: "-3%", rev: "€314,882", margin: "4.55", iar: "€70,734" },
+  },
+  {
+    action: "Markdown",
+    tone: "markdown",
+    applied: { skus: "2,043", rot: "90%", rev: "€9,274,219", margin: "-8.82", iar: "€608,201" },
+    proposed: { skus: "1,801", rot: "98.0%", rev: "€8,175,658", margin: "-8.82", iar: "€536,158" },
+  },
+  {
+    action: "Net",
+    tone: "net",
+    applied: { skus: "2,869", rot: "63.2%", rev: "€9,602,618", margin: "-4.97", iar: "€681,971" },
+    proposed: { skus: "2,593", rot: "67.2%", rev: "€8,490,539", margin: "-4.74", iar: "€606,891" },
+  },
+];
+
+function DeltaValue({ value }) {
+  const normalized = String(value);
+  const isNegative = normalized.startsWith("-");
+  const isPositive = !isNegative && normalized !== "-";
+  return <span className={`pricingSummary__delta ${isPositive ? "is-positive" : ""} ${isNegative ? "is-negative" : ""}`}>{value}</span>;
 }
 
-function PortfolioHealthPanel({ metrics }) {
-  const maxRisk = Math.max(...metrics.riskRows.map((row) => row.count), 1);
-  const maxMargin = Math.max(...metrics.recommendationMix.map((row) => row.margin), 1);
-
+function PricingActionsSummary() {
   return (
-    <section className="panel dashboardHealthPanel">
-      <div className="panel__head">
-        <div className="panel__title">Risk and action mix</div>
+    <section className="pricingSummary">
+      <div className="pricingSummary__header">
+        <div>
+          <div className="pricingSummary__title">Up to date pricing actions summary</div>
+          <div className="pricingSummary__subtitle">Applied performance and today&apos;s proposed pricing actions</div>
+        </div>
+        <div className="pricingSummary__count">28,790 SKUs</div>
       </div>
-      <div className="panel__body dashboardHealthPanel__body">
-        <div className="healthBlock">
-          <div className="healthBlock__title">Recommendation upside</div>
-          {metrics.recommendationMix.map((row) => (
-            <MetricBar
-              key={row.label}
-              label={row.label}
-              value={fmtEURWhole(row.margin)}
-              detail={`${fmtInt(row.count)} actions recommended at week 9`}
-              ratio={row.margin / maxMargin}
-              tone={row.tone}
-            />
-          ))}
-        </div>
-        <div className="healthBlock">
-          <div className="healthBlock__title">Applied action risk</div>
-          {metrics.riskRows.map((row) => (
-            <MetricBar
-              key={row.label}
-              label={row.label}
-              value={fmtInt(row.count)}
-              detail={`${fmtPct(row.count / metrics.totalApplied)} of applied actions`}
-              ratio={row.count / maxRisk}
-              tone={row.tone}
-            />
-          ))}
-        </div>
-        <div className="healthBlock">
-          <div className="healthBlock__title">End-season inventory forecast</div>
-          <MetricBar label="No further change" value={fmtPct((metrics.noChangeEnd || 0) / 100)} detail="average remaining stock" ratio={(metrics.noChangeEnd || 0) / 100} tone="warn" />
-          <MetricBar label="With next actions" value={fmtPct((metrics.recommendedEnd || 0) / 100)} detail="after recommended follow-ups" ratio={(metrics.recommendedEnd || 0) / 100} tone="good" />
-        </div>
+      <div className="pricingSummary__tableWrap">
+        <table className="pricingSummary__table">
+          <thead>
+            <tr>
+              <th className="pricingSummary__actionHead" rowSpan="2">Action</th>
+              <th className="pricingSummary__groupHead" colSpan="5">Applied (cumulative)</th>
+              <th className="pricingSummary__groupHead pricingSummary__groupHead--proposed" colSpan="5">Proposed (today)</th>
+            </tr>
+            <tr>
+              <th>SKUs</th>
+              <th>Δ rot</th>
+              <th>Δ rev</th>
+              <th>Δ margin</th>
+              <th>IaR</th>
+              <th className="pricingSummary__proposedStart">SKUs</th>
+              <th>Δ rot</th>
+              <th>Δ rev</th>
+              <th>Δ margin</th>
+              <th>IaR</th>
+            </tr>
+          </thead>
+          <tbody>
+            {PRICING_ACTION_SUMMARY.map((row) => (
+              <tr className={row.tone === "net" ? "pricingSummary__netRow" : ""} key={row.action}>
+                <th>
+                  <span className={`pricingSummary__actionDot pricingSummary__actionDot--${row.tone}`} />
+                  {row.action}
+                </th>
+                <td>{row.applied.skus}</td>
+                <td><DeltaValue value={row.applied.rot} /></td>
+                <td><DeltaValue value={row.applied.rev} /></td>
+                <td><DeltaValue value={row.applied.margin} /></td>
+                <td>{row.applied.iar}</td>
+                <td className="pricingSummary__proposedStart">{row.proposed.skus}</td>
+                <td><DeltaValue value={row.proposed.rot} /></td>
+                <td><DeltaValue value={row.proposed.rev} /></td>
+                <td><DeltaValue value={row.proposed.margin} /></td>
+                <td>{row.proposed.iar}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </section>
   );
-}
-
-function DashboardRiskSummary() {
-  const metrics = getDashboardMetrics();
-
-  return <PortfolioHealthPanel metrics={metrics} />;
 }
 
 function DataTable({ rows, columns, onOpen }) {
@@ -745,7 +763,7 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
   return (
     <>
       <KpiRow />
-      <DashboardRiskSummary />
+      <PricingActionsSummary />
       <div className="mid">
         <section className="panel">
           <div className="panel__head">
@@ -955,7 +973,7 @@ function getDetailForProduct(product) {
   return detailExtra ? enrichDetail(product, detailExtra) : createDetailFromProduct(product);
 }
 
-function InventoryChart({ detail, scenarioKey, scenarioEntries, onScenarioChange }) {
+function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   const W = 980;
   const H = 360;
   const pad = { l: 38, r: 12, t: 14, b: 32 };
@@ -978,11 +996,7 @@ function InventoryChart({ detail, scenarioKey, scenarioEntries, onScenarioChange
   const yTicks = [0, 25, 50, 75, 100];
   const pPre = makePath("cur", (point) => point.d <= 60);
   const pNoChange = makePath("cur", (point) => point.d >= 60);
-  const scenarioPaths = scenarioEntries.map(([key], index) => ({
-    key,
-    color: getScenarioColor(index),
-    path: makePath(key, (point) => point.d >= 60),
-  }));
+  const pScenario = makePath(scenarioKey, (point) => point.d >= 60);
 
   return (
     <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
@@ -994,15 +1008,7 @@ function InventoryChart({ detail, scenarioKey, scenarioEntries, onScenarioChange
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {pPre && <path className="chartLineProductPre" d={pPre} />}
       {pNoChange && <path className="chartLineProductNoChange" d={pNoChange} />}
-      {scenarioPaths.map(({ key, color, path }) => path ? (
-        <path
-          className={`chartLineProductScenario ${key === scenarioKey ? "is-active" : ""}`}
-          d={path}
-          key={key}
-          onClick={() => onScenarioChange(key)}
-          style={{ "--scenario-color": color }}
-        />
-      ) : null)}
+      {pScenario && <path className="chartLineProductScenario is-active" d={pScenario} style={{ "--scenario-color": scenarioColor }} />}
     </svg>
   );
 }
@@ -1014,7 +1020,6 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const scenarioEntries = Object.entries(detail.scenarios);
   const selectedScenarioIndex = Math.max(0, scenarioEntries.findIndex(([key]) => key === selectedKey));
   const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
-  const scenarioColumnWidth = `${66 / (scenarioEntries.length + 1)}%`;
   const rows = [
     { label: "Obsolete inv. (units)", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
     { label: "Obsolete inv. (EUR)", current: fmtEURWhole(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtEURWhole(s.inv_eur) },
@@ -1059,21 +1064,11 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
             <div className="detailCard">
               <div className="detailCardHead"><div className="detailCardTitle">Inventory Evolution <span className="muted">(% remaining, days 0-180)</span></div></div>
               <div className="detailCardBody">
-                <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioEntries={scenarioEntries} onScenarioChange={onScenarioChange} />
+                <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioColor={selectedScenarioColor} />
                 <div className="chartLegend">
                   <div className="legendItem"><span className="legendSwatch productPre" />Observed until day 60</div>
                   <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
-                  {scenarioEntries.map(([key, value], index) => (
-                    <button
-                      className={`legendItem legendButton ${key === selectedKey ? "is-active" : ""}`}
-                      key={key}
-                      type="button"
-                      onClick={() => onScenarioChange(key)}
-                    >
-                      <span className="legendSwatch productScenario" style={{ "--scenario-color": getScenarioColor(index) }} />
-                      {value.label}
-                    </button>
-                  ))}
+                  <div className="legendItem"><span className="legendSwatch productScenario" style={{ "--scenario-color": selectedScenarioColor }} />{scenario.label}</div>
                 </div>
               </div>
             </div>
@@ -1081,21 +1076,17 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
               <div className="detailCardHead"><div className="detailCardTitle">Scenario Comparison - End of Season</div></div>
               <div className="detailCardBody">
                 <div className="table-wrap">
-                  <table className="detailTbl detailTbl--wide">
+                  <table className="detailTbl">
                     <colgroup>
-                      <col style={{ width: "34%" }} />
-                      <col style={{ width: scenarioColumnWidth }} />
-                      {scenarioEntries.map(([key]) => <col key={key} style={{ width: scenarioColumnWidth }} />)}
+                      <col style={{ width: "42%" }} />
+                      <col style={{ width: "29%" }} />
+                      <col style={{ width: "29%" }} />
                     </colgroup>
                     <thead>
                       <tr>
                         <th>Metric</th>
                         <th className="num">Current</th>
-                        {scenarioEntries.map(([key, value]) => (
-                          <th className={`num ${key === selectedKey ? "is-selectedScenario" : ""}`} key={key} title={value.label}>
-                            {getCompactScenarioLabel(value.label)}
-                          </th>
-                        ))}
+                        <th className="num is-selectedScenario" title={scenario.label}>{getCompactScenarioLabel(scenario.label)}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1103,7 +1094,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                         <tr key={row.label}>
                           <th>{row.label}</th>
                           <td className="num">{row.current}</td>
-                          {scenarioEntries.map(([key, value]) => <td className={`num ${key === selectedKey ? "is-selectedScenario" : ""}`} key={key}>{row.getValue(value)}</td>)}
+                          <td className="num is-selectedScenario">{row.getValue(scenario)}</td>
                         </tr>
                       ))}
                     </tbody>

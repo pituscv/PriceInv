@@ -492,6 +492,152 @@ select {
   margin-bottom: 12px;
 }
 
+.pricingSummary {
+  margin: 0 6px 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(900px 280px at 0% 0%, rgba(66, 217, 200, 0.08), transparent 56%),
+    linear-gradient(180deg, rgba(14, 34, 60, 0.78), rgba(11, 26, 47, 0.78));
+  color: var(--text);
+  box-shadow: var(--shadow2);
+}
+
+.pricingSummary__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.pricingSummary__title {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1.05;
+  font-weight: 900;
+  letter-spacing: 0.1px;
+}
+
+.pricingSummary__subtitle {
+  margin-top: 7px;
+  color: var(--muted2);
+  font-size: 12.5px;
+  line-height: 1.3;
+  font-weight: 700;
+}
+
+.pricingSummary__count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.pricingSummary__tableWrap {
+  overflow: auto;
+}
+
+.pricingSummary__table {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: rgba(14, 34, 60, 0.24);
+}
+
+.pricingSummary__table th,
+.pricingSummary__table td {
+  padding: 13px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.055);
+  color: rgba(234, 242, 255, 0.92);
+  font-size: 13px;
+  line-height: 1.15;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.pricingSummary__table thead th {
+  background: rgba(6, 19, 37, 0.7);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pricingSummary__table thead tr:first-child th {
+  border-top: none;
+  padding-top: 14px;
+  padding-bottom: 7px;
+  text-align: left;
+}
+
+.pricingSummary__table thead tr:nth-child(2) th {
+  padding-top: 7px;
+  padding-bottom: 12px;
+}
+
+.pricingSummary__table tbody th {
+  text-align: left;
+  font-size: 14px;
+  font-weight: 950;
+  color: rgba(234, 242, 255, 0.95);
+}
+
+.pricingSummary__actionHead {
+  width: 150px;
+  vertical-align: bottom;
+}
+
+.pricingSummary__groupHead {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pricingSummary__groupHead--proposed,
+.pricingSummary__proposedStart {
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.pricingSummary__netRow th,
+.pricingSummary__netRow td {
+  background: rgba(66, 217, 200, 0.055);
+  font-weight: 950;
+}
+
+.pricingSummary__actionDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 10px;
+}
+
+.pricingSummary__actionDot--markup {
+  background: #7aa2ff;
+  box-shadow: 0 0 0 4px rgba(122, 162, 255, 0.1);
+}
+
+.pricingSummary__actionDot--markdown {
+  background: #42d9c8;
+  box-shadow: 0 0 0 4px rgba(66, 217, 200, 0.1);
+}
+
+.pricingSummary__actionDot--net {
+  background: rgba(234, 242, 255, 0.75);
+}
+
+.pricingSummary__delta.is-positive {
+  color: #6fe2c5;
+  font-weight: 900;
+}
+
+.pricingSummary__delta.is-negative {
+  color: #ff8585;
+  font-weight: 900;
+}
+
 .dashboardHealthPanel__body {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1828,6 +1974,15 @@ select {
 
   .pageHeader h1 {
     font-size: 21px;
+  }
+
+  .pricingSummary__header {
+    flex-direction: column;
+    padding: 16px;
+  }
+
+  .pricingSummary__title {
+    font-size: 20px;
   }
 
   .kpi-row {
