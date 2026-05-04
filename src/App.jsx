@@ -352,6 +352,8 @@ function PageHeader({ activeTab }) {
     "applied-markup": "Applied Markups",
     detail: "Product Detail",
     "applied-detail": "Applied Action Detail",
+    "matrix-detail": "Matrix Detail",
+    "matrix-markup-detail": "Matrix Detail",
   };
 
   return (
@@ -386,7 +388,7 @@ function KpiRow() {
   );
 }
 
-function TransitionMatrix() {
+function TransitionMatrix({ onOpenCell }) {
   const { cols, rows, values } = MATRIX;
   const rowTotals = values.map((row) => row.reduce((s, v) => s + (Number(v) || 0), 0));
   const colTotals = cols.map((_, ci) => values.reduce((s, row) => s + (Number(row[ci]) || 0), 0));
@@ -455,12 +457,27 @@ function TransitionMatrix() {
                   const rowPct = parseInt(row, 10);
                   const isDiagonal = ri === ci;
                   const isZero = n === 0;
+                  const clickTarget = row === "-20%" && cols[ci] === "-10%" && n === 21
+                    ? "markdown"
+                    : row === "+10%" && cols[ci] === "+10%" && n === 142
+                      ? "markup"
+                      : null;
+                  const isClickableCell = Boolean(clickTarget);
                   const alpha = isZero ? 0 : isDiagonal ? 0.18 : clamp(Math.log1p(n) / Math.log1p(heatMax), 0.08, 1);
                   const actionClass = isDiagonal ? "matrixCell--diagonal" : rowPct < 0 ? "matrixCell--markdown" : rowPct > 0 ? "matrixCell--markup" : "matrixCell--neutral";
                   return (
                     <td
-                      className={`matrixCell ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""}`}
+                      className={`matrixCell ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""} ${isClickableCell ? "matrixCell--clickable" : ""}`}
                       key={cols[ci]}
+                      onClick={isClickableCell ? () => onOpenCell?.(clickTarget) : undefined}
+                      role={isClickableCell ? "button" : undefined}
+                      tabIndex={isClickableCell ? 0 : undefined}
+                      onKeyDown={isClickableCell ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          onOpenCell?.(clickTarget);
+                        }
+                      } : undefined}
                       style={{ "--heat": alpha }}
                     >
                       {n > 0 ? fmtInt(n) : ""}
@@ -1198,6 +1215,104 @@ function RecommendationTableSection({ type, onOpen, title, hint, showCategory = 
   );
 }
 
+function MatrixDetailPage({ onOpen, onBack }) {
+  const matrixDetailSkus = ["AT-93847", "ST-35780"];
+  const matrixDetailOverrides = {
+    "AT-93847": {
+      rev_uplift: 456400,
+      margin_up: 75062,
+      final_pct_comp: -0.05,
+    },
+  };
+  const recommendationRows = getRecommendationRows("markdown");
+  const rows = matrixDetailSkus
+    .map((sku) => recommendationRows.find((row) => row.sku === sku))
+    .filter(Boolean)
+    .map((row) => {
+      const merged = { ...row, ...(matrixDetailOverrides[row.sku] || {}) };
+      return {
+        ...merged,
+        final_pct_comp: merged.final_pct_comp ?? (Number(merged.comp) ? (Number(merged.final_price) - Number(merged.comp)) / Number(merged.comp) : null),
+      };
+    });
+  const revMax = Math.max(...rows.map((row) => Number(row.rev_uplift) || 0), 1);
+  const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
+  const riskMax = Math.max(...rows.map((row) => Number(row.inv_risk_pct) || 0), 1);
+  const columns = [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
+    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
+    { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
+    { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: riskMax },
+    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
+    { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
+    { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
+    { key: "obsolete", label: "Obsolete post", align: "num", render: fmtPct },
+    { key: "rev_uplift", label: "Revenue Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: revMax },
+    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
+    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtIndex },
+  ];
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">Matrix markdown actions</div>
+          <div className="panel__hint">Products behind the selected Week 8 to Week 9 markdown transition.</div>
+        </div>
+        <button className="btn btn--ghost btn--compact" type="button" onClick={onBack}>Back to Dashboard</button>
+      </div>
+      <div className="panel__body">
+        <DataTable rows={rows} columns={columns} onOpen={onOpen} />
+        <div className="footnote">{rows.length} products shown from Top Markdowns.</div>
+      </div>
+    </section>
+  );
+}
+
+function MatrixMarkupDetailPage({ onOpen, onBack }) {
+  const baseRow = getRecommendationRows("markup").find((row) => row.sku === "RS-71058");
+  const rows = baseRow ? [{
+    ...baseRow,
+    pct_comp: -0.10,
+    rot: 1.82,
+    exact_action_pct: 0.101,
+    final_pct_comp: -0.01,
+  }] : [];
+  const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
+  const revenueMax = Math.max(...rows.map((row) => Number(row.rev_uplift) || 0), 1);
+  const rotationMax = Math.max(...rows.map((row) => Number(row.rot) || 0), 1);
+  const fmtWholePct = (value) => value == null || Number.isNaN(Number(value)) ? "-" : `${Math.round(Number(value) * 100)}%`;
+  const columns = [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
+    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
+    { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtWholePct },
+    { key: "rot", label: "Rotation vs Forecast", align: "num", render: fmtPctFromMult, cellClass: "upsideCell", max: rotationMax },
+    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
+    { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
+    { key: "rev_uplift", label: "Revenue Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: revenueMax },
+    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
+    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtWholePct },
+  ];
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">Matrix markup actions</div>
+          <div className="panel__hint">Product behind the selected Week 8 to Week 9 markup transition.</div>
+        </div>
+        <button className="btn btn--ghost btn--compact" type="button" onClick={onBack}>Back to Dashboard</button>
+      </div>
+      <div className="panel__body">
+        <DataTable rows={rows} columns={columns} onOpen={onOpen} />
+        <div className="footnote">{rows.length} product shown from Top Markups.</div>
+      </div>
+    </section>
+  );
+}
+
 function RecommendationsPage({ type = "", onOpen }) {
   if (type === "markdown") {
     return (
@@ -1237,7 +1352,7 @@ function RecommendationsPage({ type = "", onOpen }) {
   );
 }
 
-function OverviewPage({ onOpen, onOpenAppliedAction }) {
+function OverviewPage({ onOpenMatrixCell }) {
   return (
     <>
       <WeeklyDashboardOverview />
@@ -1246,7 +1361,7 @@ function OverviewPage({ onOpen, onOpenAppliedAction }) {
         <div className="panel__head">
           <div className="panel__title panel__title--dashboard">Transition matrix</div>
         </div>
-        <div className="panel__body"><TransitionMatrix /></div>
+        <div className="panel__body"><TransitionMatrix onOpenCell={onOpenMatrixCell} /></div>
       </section>
     </>
   );
@@ -1559,12 +1674,12 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   );
 }
 
-function AppliedSalesChart({ action }) {
+function AppliedSalesChart({ action, scenarioField = "recommended" }) {
   const W = 980;
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
-  const currentDay = CURRENT_DAY;
-  const fields = ["actual", "noAction", "noChange", "recommended"];
+  const currentDay = action.currentDay ?? CURRENT_DAY;
+  const fields = ["actual", "noAction", "noChange", scenarioField];
   const allValues = action.timeline.flatMap((point) => fields.map((field) => point[field]).filter((value) => value != null));
   const maxY = Math.max(100, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
@@ -1579,7 +1694,7 @@ function AppliedSalesChart({ action }) {
     ["actual", "chartLineActual"],
     ["noAction", "chartLineNoAction"],
     ["noChange", "chartLineNoChange"],
-    ["recommended", "chartLineRecommended"],
+    [scenarioField, "chartLineRecommended"],
   ].map(([field, className]) => [makePath(field), className]);
 
   return (
@@ -1589,7 +1704,7 @@ function AppliedSalesChart({ action }) {
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
       <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
       <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
-      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day {CURRENT_DAY}</text>
+      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day {currentDay}</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
@@ -1600,7 +1715,13 @@ function AppliedSalesChart({ action }) {
 function AppliedActionDetailPage({ selectedAction, onBack }) {
   const action = selectedAction;
   const product = getProductBySku(action.sku);
-  const hasRecommendedPath = action.timeline.some((point) => point.recommended != null);
+  const scenarioEntries = Object.entries(action.scenarios || {});
+  const [selectedScenarioKey, setSelectedScenarioKey] = useState(action.defaultScenario || scenarioEntries[0]?.[0] || "");
+  const selectedScenario = action.scenarios?.[selectedScenarioKey] || scenarioEntries[0]?.[1] || null;
+  const selectedScenarioIndex = Math.max(0, scenarioEntries.findIndex(([key]) => key === selectedScenarioKey));
+  const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
+  const selectedScenarioField = selectedScenario?.field || "recommended";
+  const hasRecommendedPath = action.timeline.some((point) => point[selectedScenarioField] != null);
   const rows = [
     ["Rotation before", fmtPctFromMult(action.preRotation)],
     ["Rotation after", fmtPctFromMult(action.postRotation)],
@@ -1608,8 +1729,20 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
     ["Revenue impact", fmtEUR(action.revenueImpact)],
     ["Margin impact", fmtEUR(action.marginImpact)],
     ["Updated inventory forecast", fmtPct(action.updatedInventoryForecast)],
+    ...(action.recommendedInventoryForecast != null ? [["Recommended inventory forecast", fmtPct(action.recommendedInventoryForecast)]] : []),
     ["Effectiveness score", fmtPct(action.effectiveness)],
+    ...(action.recommendedRotation != null ? [["Recommended rotation factor", fmtPctFromMult(action.recommendedRotation)]] : []),
   ];
+  const hasScenarioComparison = Boolean(action.scenarioCurrent && selectedScenario);
+  const fmtEURScenario = (value) => Number(value) === 0 ? "-" : fmtEURWhole(value);
+  const scenarioRows = hasScenarioComparison ? [
+    { label: "Obsolete inventory units", current: fmtInt(action.scenarioCurrent.inv_units), selected: fmtInt(selectedScenario.inv_units) },
+    { label: "Obsolete inventory euros", current: fmtEURScenario(action.scenarioCurrent.inv_eur), selected: fmtEURScenario(selectedScenario.inv_eur) },
+    { label: "Revenue uplift", current: fmtEURWhole(action.scenarioCurrent.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
+    { label: "Margin uplift", current: fmtEURWhole(action.scenarioCurrent.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
+  ] : [];
+  const currentPriceIndex = product?.pct_comp ?? (Number(product?.comp) ? (Number(action.oldPrice) - Number(product.comp)) / Number(product.comp) : null);
+  const detailElasticity = PRODUCT_DETAILS[product?.sku]?.elasticity || "High";
 
   return (
     <section className="panel">
@@ -1633,18 +1766,38 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                 </div>
               </div>
               <div className="detailScenarioPill">
-                <div className="detailScenarioPill__label">Applied</div>
-                <div className="appliedActionName">{action.action}</div>
+                <div className="detailScenarioPill__label">{hasScenarioComparison ? "Scenario" : "Applied"}</div>
+                {hasScenarioComparison ? (
+                  <select className="detailScenarioPill__select" value={selectedScenarioKey} onChange={(event) => setSelectedScenarioKey(event.target.value)}>
+                    {scenarioEntries.map(([key, scenario]) => <option value={key} key={key}>{scenario.label}</option>)}
+                  </select>
+                ) : (
+                  <div className="appliedActionName">{action.action}</div>
+                )}
               </div>
             </div>
             <div className="detailHeroStats">
-              <HeroStat label="SKU" value={action.sku} sub={`Applied day: ${action.appliedDay}`} />
-              <div className="heroDivider" />
-              <HeroStat label="Price move" value={<PriceMove oldPrice={action.oldPrice} newPrice={action.newPrice} competitorPrice={product?.comp} variant="hero" />} />
-              <div className="heroDivider" />
-              <HeroStat label="Rotation delta" value={fmtSignedPct(action.rotationDelta)} sub={`${fmtPctFromMult(action.preRotation)} to ${fmtPctFromMult(action.postRotation)}`} blue={action.rotationDelta >= 0} />
-              <div className="heroDivider" />
-              <HeroStat label="Next action" value={action.nextAction} purple={statusTone(action.outcome) !== "good"} />
+              {hasScenarioComparison ? (
+                <>
+                  <HeroStat label="Elasticity" value={detailElasticity} purple />
+                  <div className="heroDivider" />
+                  <HeroStat label="SKU" value={action.sku} sub={`Current price: ${fmtEUR(action.oldPrice)}`} />
+                  <div className="heroDivider" />
+                  <HeroStat label="Current price vs competitor" value={fmtIndex(currentPriceIndex)} sub={`Competitor price: ${fmtEUR(product?.comp)}`} />
+                  <div className="heroDivider" />
+                  <HeroStat label="Proposed price vs competitor" value={fmtIndex(selectedScenario.proposed_index)} sub={`Proposed price: ${fmtEUR(selectedScenario.price)}`} color={selectedScenarioColor} />
+                </>
+              ) : (
+                <>
+                  <HeroStat label="SKU" value={action.sku} sub={`Applied day: ${action.appliedDay}`} />
+                  <div className="heroDivider" />
+                  <HeroStat label="Price move" value={<PriceMove oldPrice={action.oldPrice} newPrice={action.newPrice} competitorPrice={product?.comp} variant="hero" />} />
+                  <div className="heroDivider" />
+                  <HeroStat label="Rotation delta" value={fmtSignedPct(action.rotationDelta)} sub={`${fmtPctFromMult(action.preRotation)} to ${fmtPctFromMult(action.postRotation)}`} blue={action.rotationDelta >= 0} />
+                  <div className="heroDivider" />
+                  <HeroStat label="Next action" value={action.nextAction} purple={statusTone(action.outcome) !== "good"} />
+                </>
+              )}
             </div>
           </div>
           <div className="detailGrid2">
@@ -1653,21 +1806,55 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                 <div className="detailCardTitle">Inventory Response <span className="muted">(% remaining, days 0-180)</span></div>
               </div>
               <div className="detailCardBody">
-                <AppliedSalesChart action={action} />
+                <AppliedSalesChart action={action} scenarioField={selectedScenarioField} />
                 <div className="chartLegend">
                   <div className="legendItem"><span className="legendSwatch actual" />Observed until today</div>
                   <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
                   <div className="legendItem"><span className="legendSwatch noChange" />No further change forecast</div>
-                  {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch recommended" />Recommended action forecast</div>}
+                  {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch recommended" />{selectedScenario?.label || "Recommended action forecast"}</div>}
                 </div>
               </div>
             </div>
             <div className="detailCard">
-              <div className="detailCardHead"><div className="detailCardTitle">Pre / Post Metrics</div></div>
+              <div className="detailCardHead"><div className="detailCardTitle">{hasScenarioComparison ? "Scenario Comparison - End of Season" : "Pre / Post Metrics"}</div></div>
               <div className="detailCardBody">
-                <table className="detailTbl">
-                  <tbody>{rows.map(([label, value]) => <tr key={label}><th>{label}</th><td className="num">{value}</td></tr>)}</tbody>
-                </table>
+                {hasScenarioComparison ? (
+                  <>
+                    <div className="table-wrap">
+                      <table className="detailTbl">
+                        <colgroup>
+                          <col style={{ width: "42%" }} />
+                          <col style={{ width: "29%" }} />
+                          <col style={{ width: "29%" }} />
+                        </colgroup>
+                        <thead>
+                          <tr>
+                            <th>Metric</th>
+                            <th className="num">Current</th>
+                            <th className="num is-selectedScenario">{getCompactScenarioLabel(selectedScenario.label)}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {scenarioRows.map((row) => (
+                            <tr key={row.label}>
+                              <th>{row.label}</th>
+                              <td className="num">{row.current}</td>
+                              <td className="num is-selectedScenario">{row.selected}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className={`detailKpiRow scenarioKpiRow ${selectedScenario.margin_uplift < -30000 ? "scenarioKpiRow--bad" : selectedScenario.margin_uplift < -11000 ? "scenarioKpiRow--warn" : "scenarioKpiRow--good"}`}>
+                      <div className="detailKpiLabel">Incremental margin</div>
+                      <div className="detailKpiVal">{fmtEUR(selectedScenario.margin_uplift)}</div>
+                    </div>
+                  </>
+                ) : (
+                  <table className="detailTbl">
+                    <tbody>{rows.map(([label, value]) => <tr key={label}><th>{label}</th><td className="num">{value}</td></tr>)}</tbody>
+                  </table>
+                )}
                 <div className="insightBlock">
                   <div className="insightBlock__label">Insight</div>
                   <div className="insightBlock__text">{action.insight}</div>
@@ -1702,9 +1889,19 @@ export default function App() {
   const [search, setSearch] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedAppliedAction, setSelectedAppliedAction] = useState(null);
+  const [appliedBackTab, setAppliedBackTab] = useState("applied-actions");
   const [scenarioKey, setScenarioKey] = useState("md10");
 
   function openProduct(product) {
+    if (product?.sku === "AT-93847") {
+      const appliedAction = APPLIED_ACTIONS.find((action) => action.sku === product.sku);
+      if (appliedAction) {
+        setSelectedAppliedAction(appliedAction);
+        setAppliedBackTab(activeTab === "matrix-detail" ? "matrix-detail" : "applied-actions");
+        setActiveTab("applied-detail");
+        return;
+      }
+    }
     setSelectedProduct(product);
     const detail = getDetailForProduct(product);
     setScenarioKey(detail.defaultScenario);
@@ -1713,7 +1910,12 @@ export default function App() {
 
   function openAppliedAction(action) {
     setSelectedAppliedAction(action);
+    setAppliedBackTab(activeTab.startsWith("applied") ? activeTab : "applied-actions");
     setActiveTab("applied-detail");
+  }
+
+  function openMatrixDetail(type = "markdown") {
+    setActiveTab(type === "markup" ? "matrix-markup-detail" : "matrix-detail");
   }
 
   return (
@@ -1722,7 +1924,7 @@ export default function App() {
       <div className="mainShell">
         <PageHeader activeTab={activeTab} />
         <main className="content">
-          {activeTab === "overview" && <OverviewPage onOpen={openProduct} onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "overview" && <OverviewPage onOpenMatrixCell={openMatrixDetail} />}
           {activeTab === "recommendations" && <RecommendationsPage onOpen={openProduct} />}
           {activeTab === "recommendations-markdown" && <RecommendationsPage type="markdown" onOpen={openProduct} />}
           {activeTab === "recommendations-markup" && <RecommendationsPage type="markup" onOpen={openProduct} />}
@@ -1730,8 +1932,10 @@ export default function App() {
           {activeTab === "applied-actions" && <AppliedActionsPage onOpenAppliedAction={openAppliedAction} />}
           {activeTab === "applied-markdown" && <AppliedActionsPage type="markdown" onOpenAppliedAction={openAppliedAction} />}
           {activeTab === "applied-markup" && <AppliedActionsPage type="markup" onOpenAppliedAction={openAppliedAction} />}
+          {activeTab === "matrix-detail" && <MatrixDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
+          {activeTab === "matrix-markup-detail" && <MatrixMarkupDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
           {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
-          {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab("applied-actions")} />}
+          {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab(appliedBackTab)} />}
         </main>
       </div>
     </div>

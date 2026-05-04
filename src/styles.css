@@ -1771,6 +1771,25 @@ select {
     inset 0 0 18px rgba(255, 255, 255, calc(var(--heat, 0) * 0.035));
 }
 
+.matrixCell--clickable {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.matrixCell--clickable:hover {
+  filter: brightness(1.14);
+  box-shadow:
+    inset 0 0 0 1px rgba(66, 217, 200, 0.46),
+    inset 0 0 18px rgba(255, 255, 255, calc(var(--heat, 0) * 0.045)),
+    0 0 0 1px rgba(66, 217, 200, 0.2);
+}
+
+.matrixCell--clickable:focus-visible {
+  outline: 2px solid rgba(66, 217, 200, 0.7);
+  outline-offset: -2px;
+}
+
 .matrix .rowhdr {
   width: 118px;
   min-width: 118px;
@@ -2673,6 +2692,25 @@ select {
 .detailKpiVal {
   font-weight: 950;
   font-size: 18px;
+}
+
+.scenarioKpiRow {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+}
+
+.scenarioKpiRow--good {
+  background: rgba(66, 217, 200, 0.16);
+}
+
+.scenarioKpiRow--warn {
+  background: rgba(244, 184, 74, 0.16);
+}
+
+.scenarioKpiRow--bad {
+  background: rgba(255, 112, 112, 0.2);
 }
 
 .insightBlock {
