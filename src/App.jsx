@@ -13,6 +13,7 @@ const recoPalette = {
 
 const scenarioColors = ["#42d9c8", "#9f7cff", "#f4b84a", "#ff7aa2"];
 const CATEGORY_OPTIONS = ["Clothing", "Footwear", "Accessories"];
+const CURRENT_DAY = 56;
 
 function getScenarioColor(index) {
   return scenarioColors[index % scenarioColors.length];
@@ -175,7 +176,7 @@ function getDashboardMetrics() {
   const expectedMargin = sumBy(recommendations, (product) => product.margin_up);
   const successfulActions = APPLIED_ACTIONS.filter((action) => Number(action.effectiveness) >= 0.65).length;
   const successRate = APPLIED_ACTIONS.length ? successfulActions / APPLIED_ACTIONS.length : 0;
-  const remainingToday = avgNumbers(APPLIED_ACTIONS.map((action) => timelinePoint(action, 60)?.actual));
+  const remainingToday = avgNumbers(APPLIED_ACTIONS.map((action) => timelinePoint(action, CURRENT_DAY)?.actual));
   const sellThrough = remainingToday == null ? null : 1 - remainingToday / 100;
   const noChangeEnd = avgNumbers(APPLIED_ACTIONS.map((action) => timelinePoint(action, 180)?.noChange));
   const recommendedEnd = avgNumbers(APPLIED_ACTIONS.map((action) => {
@@ -357,7 +358,7 @@ function PageHeader({ activeTab }) {
     <header className="pageHeader">
       <div>
         <h1>{titles[activeTab] || "Dashboard"}</h1>
-        <p>Current season day 60</p>
+        <p>Current season day {CURRENT_DAY}</p>
       </div>
     </header>
   );
@@ -411,6 +412,12 @@ function TransitionMatrix() {
       "--policy-glow": glow,
     };
   }
+  function policyBandLabel(label) {
+    const pct = parseInt(label, 10);
+    if (pct === 0) return "0.0%";
+    if (pct < 0) return `${(pct + 9.9).toFixed(1)}% to ${pct}%`;
+    return `${(pct - 9.9).toFixed(1)}% to ${pct}%`;
+  }
   return (
     <>
       <div className="table-wrap">
@@ -418,7 +425,7 @@ function TransitionMatrix() {
           <thead>
             <tr>
               <th className="matrix__axisCorner" colSpan="2" />
-              <th className="matrix__superHeader" colSpan={cols.length}>Current policy</th>
+              <th className="matrix__superHeader" colSpan={cols.length}>Current policy week 8</th>
               <th className="matrix__totalHeader">Total</th>
             </tr>
             <tr>
@@ -426,7 +433,7 @@ function TransitionMatrix() {
               <th className="rowhdr matrix__rowAxisLabel" />
               {cols.map((col, index) => (
                 <th key={col}>
-                  <span className={`band band--policy ${index === 0 ? "band--first" : ""} ${index === cols.length - 1 ? "band--last" : ""}`} style={policyBandStyle(col)}>{col}</span>
+                  <span className={`band band--policy ${index === 0 ? "band--first" : ""} ${index === cols.length - 1 ? "band--last" : ""}`} style={policyBandStyle(col)}>{policyBandLabel(col)}</span>
                 </th>
               ))}
               <th className="matrix__totalHeader" />
@@ -437,11 +444,11 @@ function TransitionMatrix() {
               <tr key={row}>
                 {ri === 0 && (
                   <th className="matrix__yAxis" rowSpan={rows.length + 1}>
-                    <span>Proposed policy</span>
+                    <span>Proposed policy week 9</span>
                   </th>
                 )}
                 <th className="rowhdr">
-                  <span className={`band band--policy ${ri === 0 ? "band--top" : ""} ${ri === rows.length - 1 ? "band--bottom" : ""}`} style={policyBandStyle(row)}>{row}</span>
+                  <span className={`band band--policy ${ri === 0 ? "band--top" : ""} ${ri === rows.length - 1 ? "band--bottom" : ""}`} style={policyBandStyle(row)}>{policyBandLabel(row)}</span>
                 </th>
                 {values[ri].map((value, ci) => {
                   const n = Number(value) || 0;
@@ -465,7 +472,7 @@ function TransitionMatrix() {
             ))}
             <tr>
               <th className="rowhdr">Total</th>
-              {colTotals.map((total, i) => <td className="totalCell" key={cols[i]}>{total > 0 ? fmtInt(total) : ""}</td>)}
+              {colTotals.map((total, i) => <td className="totalCell" key={cols[i]}>{fmtInt(total)}</td>)}
               <td />
             </tr>
           </tbody>
@@ -483,7 +490,7 @@ function TransitionMatrix() {
 function ImpactTiles() {
   const stats = computeMatrixStats();
   const tiles = [
-    ["Current Season Day", 60],
+    ["Current Season Day", CURRENT_DAY],
     ["SKUs with markdown applied", Math.round(stats.mdApplied)],
     ["SKUs with markup applied", Math.round(stats.muApplied)],
   ];
@@ -581,6 +588,477 @@ function PricingActionsSummary() {
         </table>
       </div>
     </section>
+  );
+}
+
+const SEASON_OVERVIEW = [
+  { metric: "Forecast Revenue (EUR)", day0: "112,831,475", day30: "108,656,710", day60: "111,139,003" },
+  { metric: "vs Plan", day0: "-", day30: "-4,174,765", day60: "-1,692,472", type: "variance" },
+  { metric: "Forecast Margin (EUR)", day0: "40,168,005", day30: "38,681,789", day60: "39,565,485" },
+  { metric: "vs Plan", day0: "-", day30: "-1,486,216", day60: "-602,520", type: "variance" },
+  { metric: "Markdown SKUs (#)", day0: "-", day30: "1,634", day60: "2,043" },
+  { metric: "Markup SKUs (#)", day0: "-", day30: "688", day60: "826" },
+  { metric: "Inventory Forecast (EUR)", day0: "-", day30: "3,753,623", day60: "3,265,652" },
+  { metric: "Inventory Risk", day0: "-", day30: "High", day60: "Medium", type: "risk" },
+];
+
+const WEEKLY_OVERVIEW_COLUMNS = [
+  { week: "Week 0", day: "Day 0" },
+  { week: "Week 1", day: "Day 7" },
+  { week: "Week 2", day: "Day 14" },
+  { week: "Week 3", day: "Day 21" },
+  { week: "Week 4", day: "Day 28" },
+  { week: "Week 5", day: "Day 35" },
+  { week: "Week 6", day: "Day 42" },
+  { week: "Week 7", day: "Day 49" },
+  { week: "Week 8", day: "Day 56", current: true },
+  { week: "Week 9", day: "Day 63", forecast: true },
+];
+
+const WEEKLY_OVERVIEW_ROWS = [
+  { label: "Forecast Revenue (EUR)", values: ["112,831,475", "111,900,000", "110,800,000", "109,900,000", "108,656,710", "109,200,000", "110,000,000", "110,600,000", "110,900,000", "111,139,003"] },
+  { label: "vs Plan", values: ["-", "931", "-2,031,475", "-2,931,475", "-4,174,765", "-3,631,475", "-2,831,475", "-2,231,475", "-1,931,475", "-1,692,472"], type: "variance" },
+  { label: "Forecast Margin (EUR)", values: ["40,168,005", "39,900,000", "39,300,000", "39,000,000", "38,681,789", "38,950,000", "39,200,000", "39,350,000", "39,450,000", "39,565,485"] },
+  { label: "vs Plan", values: ["-", "268", "868", "-1,168,005", "-1,486,216", "-1,218,005", "-968", "-818", "-718", "-603"], type: "variance" },
+  { label: "Markdown Recommendation SKUs (#)", values: ["-", "917", "1,183", "1,322", "1,419", "1,771", "1,846", "1,913", "1,987", "2,132"], tone: "markdown" },
+  { label: "Markup Recommendation SKUs (#)", values: ["-", "201", "263", "309", "334", "362", "377", "391", "403", "439"], tone: "markup" },
+  { label: "Cumulative Sell-Through Rate", values: ["0%", "4%", "9%", "14%", "19%", "24%", "29%", "33%", "36%", "40%"], type: "rate" },
+  { label: "vs Plan", values: ["-", "-1pp", "-2pp", "-3pp", "-4pp", "-3pp", "-2pp", "-2pp", "-2pp", "-1pp"], type: "variance" },
+];
+
+const SEASON_STATUS = {
+  appliedWeek8: [
+    { label: "Total Markdowns", value: "1,987", tone: "markdown" },
+    { label: "Total Markups", value: "403", tone: "markup" },
+  ],
+  incrementalWeek9: [
+    { label: "Incremental Markdowns", total: "145", alreadyImplemented: "64", requiringAction: "81", tone: "markdown" },
+    { label: "Incremental Markups", total: "36", alreadyImplemented: "16", requiringAction: "20", tone: "markup" },
+  ],
+  totalWeek9: [
+    { label: "Total Markdowns", value: "2,132", tone: "markdown" },
+    { label: "Total Markups", value: "439", tone: "markup" },
+  ],
+};
+
+const PRICING_ACTION_DETAIL = [
+  {
+    group: "Markdowns",
+    action: "Total Markdowns",
+    tone: "markdown",
+    isTotal: true,
+    day30: { skus: "2,043", share: "-", rotation: "11%", revenue: "1,985,834", margin: "265,109" },
+    day60: { skus: "3,055", share: "-", rotation: "12%", revenue: "1,066,257", margin: "671,742" },
+  },
+  {
+    group: "Markdowns",
+    action: "Markdowns no modification",
+    tone: "markdown",
+    day30: { skus: "1,176", share: "72%", rotation: "8.0%", revenue: "1,143,840", margin: "152,703" },
+    day60: { skus: "1,254", share: "61%", rotation: "12%", revenue: "654,632", margin: "329,854" },
+  },
+  {
+    group: "Markdowns",
+    action: "Markdown modification",
+    tone: "markdown",
+    day30: { skus: "458", share: "28%", rotation: "13.0%", revenue: "256,220", margin: "34,205" },
+    day60: { skus: "789", share: "39%", rotation: "11%", revenue: "252,879", margin: "101,911" },
+  },
+  {
+    group: "Markdowns",
+    action: "Markdown new action",
+    tone: "markdown",
+    day30: { skus: "409", share: "25%", rotation: "16.0%", revenue: "51,244", margin: "6,841" },
+    day60: { skus: "1,012", share: "50%", rotation: "14%", revenue: "125,294", margin: "40,385" },
+  },
+  {
+    group: "Markups",
+    action: "Total Markups",
+    tone: "markup",
+    isTotal: true,
+    startsGroup: true,
+    day30: { skus: "826", share: "-", rotation: "3%", revenue: "496,458", margin: "618,587" },
+    day60: { skus: "1,383", share: "-", rotation: "2%", revenue: "626,215", margin: "222,932" },
+  },
+  {
+    group: "Markups",
+    action: "Markups no modification",
+    tone: "markup",
+    day30: { skus: "413", share: "60%", rotation: "2.0%", revenue: "100,337", margin: "296,922" },
+    day60: { skus: "591", share: "72%", rotation: "1%", revenue: "18,119", margin: "127,606" },
+  },
+  {
+    group: "Markups",
+    action: "Markup modification",
+    tone: "markup",
+    day30: { skus: "275", share: "40%", rotation: "3.8%", revenue: "13,519", margin: "95,015" },
+    day60: { skus: "235", share: "28%", rotation: "3%", revenue: "2,085", margin: "29,043" },
+  },
+  {
+    group: "Markups",
+    action: "Markup new action",
+    tone: "markup",
+    day30: { skus: "138", share: "20%", rotation: "3.0%", revenue: "911", margin: "15,202" },
+    day60: { skus: "557", share: "67%", rotation: "3%", revenue: "568,114", margin: "15,657" },
+  },
+  {
+    group: "Net",
+    action: "Net",
+    tone: "net",
+    isNet: true,
+    day30: { skus: "2,869", share: "-", rotation: "-", revenue: "2,482,292", margin: "883,696" },
+    day60: { skus: "-", share: "-", rotation: "9%", revenue: "1,692,472", margin: "602,520" },
+  },
+];
+
+function DashboardValue({ value, type }) {
+  const text = String(value);
+  const isNegative = text.trim().startsWith("-");
+  const riskTone = text === "High" ? "high" : text === "Medium" ? "medium" : text === "Low" ? "low" : "";
+  if (type === "risk" && riskTone) {
+    return <span className={`dashboardRisk dashboardRisk--${riskTone}`}>{text}</span>;
+  }
+  return <span className={isNegative ? "dashboardValue dashboardValue--negative" : "dashboardValue"}>{text}</span>;
+}
+
+function ImpactValue({ value }) {
+  const text = String(value);
+  const isNegative = text.trim().startsWith("-");
+  const isEmpty = text === "-";
+  return <span className={`dashboardImpactValue ${isNegative ? "is-negative" : ""} ${!isNegative && !isEmpty ? "is-positive" : ""}`}>{text}</span>;
+}
+
+const SEASON_SNAPSHOT = [
+  { label: "Revenue forecast", value: "EUR 111.1M", detail: "Day 56 vs plan", delta: "-EUR 1.69M", tone: "negative", fill: 86 },
+  { label: "Margin forecast", value: "EUR 39.6M", detail: "Day 56 vs plan", delta: "-EUR 0.60M", tone: "negative", fill: 88 },
+  { label: "Pricing actions monitored", value: "2,869", detail: "2,043 markdowns / 826 markups", delta: "Active SKUs", tone: "neutral", fill: 72 },
+  { label: "Inventory position", value: "EUR 3.27M", detail: "Forecast inventory", delta: "Medium risk", tone: "warning", fill: 58 },
+];
+
+const SEASON_CHECKPOINTS = [
+  { label: "Start", day: "Day 0", revenue: "112.8M", margin: "40.2M", markdowns: "-", markups: "-", inventory: "-", risk: "-" },
+  { label: "Mid-season", day: "Day 30", revenue: "108.7M", margin: "38.7M", markdowns: "1,634", markups: "688", inventory: "3.75M", risk: "High", riskTone: "high" },
+  { label: "Today", day: "Day 56", revenue: "111.1M", margin: "39.6M", markdowns: "2,043", markups: "826", inventory: "3.27M", risk: "Medium", riskTone: "medium", current: true },
+];
+
+const ACTION_STAGE_SUMMARY = [
+  {
+    title: "Applied performance to date",
+    subtitle: "Actions proposed at day 30 and measured today",
+    markdownShare: 71,
+    markupShare: 29,
+    netRevenue: "EUR 2,482,292",
+    netMargin: "EUR 883,696",
+    rotation: "Net rotation +9%",
+    markdown: { skus: "2,043", rotation: "11%", revenue: "EUR 1,985,834", margin: "EUR 265,109" },
+    markup: { skus: "826", rotation: "3%", revenue: "EUR 496,458", margin: "EUR 618,587" },
+  },
+  {
+    title: "Proposed today",
+    subtitle: "Recommended actions for the next pricing cycle",
+    markdownShare: 69,
+    markupShare: 31,
+    netRevenue: "EUR 1,692,472",
+    netMargin: "EUR 602,520",
+    rotation: "Expected rotation +9%",
+    markdown: { skus: "3,055", rotation: "12%", revenue: "EUR 1,066,257", margin: "EUR 671,742" },
+    markup: { skus: "1,383", rotation: "2%", revenue: "EUR 626,215", margin: "EUR 222,932" },
+  },
+];
+
+function SnapshotCard({ item }) {
+  return (
+    <div className={`snapshotCard snapshotCard--${item.tone}`}>
+      <div className="snapshotCard__label">{item.label}</div>
+      <div className="snapshotCard__value">{item.value}</div>
+      <div className="snapshotCard__meta">
+        <span>{item.detail}</span>
+        <strong>{item.delta}</strong>
+      </div>
+      <div className="snapshotCard__track">
+        <span style={{ width: `${item.fill}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function CheckpointCard({ checkpoint }) {
+  return (
+    <div className={`checkpointCard ${checkpoint.current ? "is-current" : ""}`}>
+      <div className="checkpointCard__head">
+        <div>
+          <div className="checkpointCard__label">{checkpoint.label}</div>
+          <div className="checkpointCard__day">{checkpoint.day}</div>
+        </div>
+        {checkpoint.riskTone ? <span className={`dashboardRisk dashboardRisk--${checkpoint.riskTone}`}>{checkpoint.risk}</span> : <span className="checkpointCard__muted">Plan</span>}
+      </div>
+      <div className="checkpointCard__metrics">
+        <div><span>Revenue</span><strong>EUR {checkpoint.revenue}</strong></div>
+        <div><span>Margin</span><strong>EUR {checkpoint.margin}</strong></div>
+        <div><span>Markdown SKUs</span><strong>{checkpoint.markdowns}</strong></div>
+        <div><span>Markup SKUs</span><strong>{checkpoint.markups}</strong></div>
+        <div><span>Inventory</span><strong>{checkpoint.inventory === "-" ? "-" : `EUR ${checkpoint.inventory}`}</strong></div>
+      </div>
+    </div>
+  );
+}
+
+function ActionStageCard({ stage }) {
+  return (
+    <div className="actionStageCard">
+      <div className="actionStageCard__head">
+        <div>
+          <div className="actionStageCard__title">{stage.title}</div>
+          <div className="actionStageCard__subtitle">{stage.subtitle}</div>
+        </div>
+        <div className="actionStageCard__rotation">{stage.rotation}</div>
+      </div>
+      <div className="actionMixBar" aria-hidden="true">
+        <span className="actionMixBar__markdown" style={{ width: `${stage.markdownShare}%` }} />
+        <span className="actionMixBar__markup" style={{ width: `${stage.markupShare}%` }} />
+      </div>
+      <div className="actionStageCard__rows">
+        <div className="actionStageRow">
+          <div><span className="pricingSummary__actionDot pricingSummary__actionDot--markdown" />Markdowns</div>
+          <strong>{stage.markdown.skus}</strong>
+          <span>{stage.markdown.rotation}</span>
+          <span>{stage.markdown.revenue}</span>
+          <span>{stage.markdown.margin}</span>
+        </div>
+        <div className="actionStageRow">
+          <div><span className="pricingSummary__actionDot pricingSummary__actionDot--markup" />Markups</div>
+          <strong>{stage.markup.skus}</strong>
+          <span>{stage.markup.rotation}</span>
+          <span>{stage.markup.revenue}</span>
+          <span>{stage.markup.margin}</span>
+        </div>
+      </div>
+      <div className="actionStageCard__net">
+        <span>Net impact</span>
+        <strong>{stage.netRevenue}</strong>
+        <strong>{stage.netMargin}</strong>
+      </div>
+    </div>
+  );
+}
+
+function DashboardSection({ title, subtitle, meta, children }) {
+  return (
+    <section className="dashboardSection">
+      <div className="dashboardSection__header">
+        <div>
+          <div className="dashboardSection__title">{title}</div>
+          {subtitle ? <div className="dashboardSection__subtitle">{subtitle}</div> : null}
+        </div>
+        {meta ? <div className="dashboardSection__meta">{meta}</div> : null}
+      </div>
+      <div className="dashboardTableWrap">{children}</div>
+    </section>
+  );
+}
+
+function SeasonOverviewSummary() {
+  return (
+    <DashboardSection
+      title="Season planning overview"
+      subtitle="High-level forecast deviation vs plan across the main season checkpoints."
+      meta={`Current day ${CURRENT_DAY}`}
+    >
+      <table className="dashboardTable dashboardTable--overview">
+        <thead>
+          <tr>
+            <th>KPI</th>
+            <th>Day 0 (Forecast)</th>
+            <th>Day 30</th>
+            <th className="dashboardTable__today">Day {CURRENT_DAY} (Today)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {SEASON_OVERVIEW.map((row) => (
+            <tr key={`${row.metric}-${row.day60}`}>
+              <th>{row.metric}</th>
+              <td><DashboardValue value={row.day0} type={row.type} /></td>
+              <td><DashboardValue value={row.day30} type={row.type} /></td>
+              <td className="dashboardTable__today"><DashboardValue value={row.day60} type={row.type} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashboardSection>
+  );
+}
+
+function WeeklyValue({ value, type }) {
+  const text = String(value);
+  const isNegative = text.trim().startsWith("-");
+  const isEmpty = text === "-";
+  return <span className={`weeklyValue ${isNegative ? "is-negative" : ""} ${!isNegative && !isEmpty && type === "variance" ? "is-positive" : ""}`}>{text}</span>;
+}
+
+function WeeklyDashboardOverview() {
+  return (
+    <DashboardSection
+      title="Weekly season overview"
+      subtitle=""
+      meta={`Today: Week 8 / Day ${CURRENT_DAY}`}
+    >
+      <table className="dashboardTable weeklyTable">
+        <thead>
+          <tr>
+            <th className="weeklyTable__kpiHead">KPI</th>
+            {WEEKLY_OVERVIEW_COLUMNS.map((column) => (
+              <th className={`${column.current ? "weeklyTable__current" : ""} ${column.forecast ? "weeklyTable__forecast" : ""}`} key={column.week}>
+                {column.forecast ? <span className="weeklyTable__tag">Forecast</span> : null}
+                <span className="weeklyTable__week">{column.week}</span>
+                <span className="weeklyTable__day">{column.day}</span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {WEEKLY_OVERVIEW_ROWS.map((row, rowIndex) => (
+            <tr className={`${row.type === "variance" ? "weeklyTable__varianceRow" : ""} ${row.tone ? `weeklyTable__${row.tone}Row` : ""}`} key={`${row.label}-${rowIndex}`}>
+              <th>{row.label}</th>
+              {row.values.map((value, index) => (
+                <td className={`${WEEKLY_OVERVIEW_COLUMNS[index].current ? "weeklyTable__current" : ""} ${WEEKLY_OVERVIEW_COLUMNS[index].forecast ? "weeklyTable__forecast" : ""}`} key={`${row.label}-${index}`}>
+                  <WeeklyValue value={value} type={row.type} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </DashboardSection>
+  );
+}
+
+function SeasonStatusSummary() {
+  return (
+    <DashboardSection
+      title="Season status"
+      subtitle=""
+      meta="Week 8 → Week 9"
+    >
+      <div className="seasonStatus">
+        <div className="seasonStatusCard">
+          <div className="seasonStatusCard__eyebrow">Applied base</div>
+          <div className="seasonStatusCard__title">Week 8</div>
+          <div className="seasonStatusRows">
+            {SEASON_STATUS.appliedWeek8.map((row) => (
+              <div className="seasonStatusRow" key={row.label}>
+                <span><span className={`pricingSummary__actionDot pricingSummary__actionDot--${row.tone}`} />{row.label}</span>
+                <strong>{row.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="seasonStatusCard seasonStatusCard--wide">
+          <div className="seasonStatusCard__eyebrow">Incremental proposal</div>
+          <div className="seasonStatusCard__title">Week 9 actions</div>
+          <div className="seasonStatusBreakdown">
+            {SEASON_STATUS.incrementalWeek9.map((row) => (
+              <div className="seasonStatusBreakdownItem" key={row.label}>
+                <div className="seasonStatusBreakdownItem__main">
+                  <span><span className={`pricingSummary__actionDot pricingSummary__actionDot--${row.tone}`} />{row.label}</span>
+                  <span className={`seasonStatusDelta seasonStatusDelta--${row.tone}`}>+{row.total} ↗</span>
+                </div>
+                <div className="seasonStatusSubRows">
+                  <div className="seasonStatusSubRow">
+                    <span>Modifications</span>
+                    <strong>{row.alreadyImplemented}</strong>
+                  </div>
+                  <div className="seasonStatusSubRow">
+                    <span>New actions</span>
+                    <strong>{row.requiringAction}</strong>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="seasonStatusCard seasonStatusCard--result">
+          <div className="seasonStatusCard__eyebrow">After proposal</div>
+          <div className="seasonStatusCard__title">Week 9</div>
+          <div className="seasonStatusRows">
+            {SEASON_STATUS.totalWeek9.map((row) => (
+              <div className="seasonStatusRow" key={row.label}>
+                <span><span className={`pricingSummary__actionDot pricingSummary__actionDot--${row.tone}`} />{row.label}</span>
+                <strong>{row.value}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </DashboardSection>
+  );
+}
+
+function PricingActionsDetail() {
+  const groupCounts = PRICING_ACTION_DETAIL.reduce((acc, row) => {
+    acc[row.group] = (acc[row.group] || 0) + 1;
+    return acc;
+  }, {});
+  const seenGroups = {};
+  return (
+    <DashboardSection
+      title="Pricing actions impact"
+      subtitle="Applied markdown and markup performance, plus the actions proposed today and their expected impact."
+      meta="Applied vs proposed"
+    >
+      <table className="dashboardTable dashboardTable--actions">
+        <thead>
+          <tr>
+            <th rowSpan="2">Type</th>
+            <th rowSpan="2">Action</th>
+            <th className="dashboardTable__group" colSpan="2">Proposed at day 30</th>
+            <th className="dashboardTable__group" colSpan="3">Applied performance to date</th>
+            <th className="dashboardTable__group dashboardTable__today" colSpan="2">Proposed today - day {CURRENT_DAY}</th>
+            <th className="dashboardTable__group" colSpan="3">Expected impact</th>
+          </tr>
+          <tr>
+            <th>SKUs</th>
+            <th>% of previous set</th>
+            <th>Rotation impact</th>
+            <th>Revenue impact (EUR)</th>
+            <th>Margin impact (EUR)</th>
+            <th className="dashboardTable__today">SKUs</th>
+            <th>% of current set</th>
+            <th>Rotation impact</th>
+            <th>Revenue impact (EUR)</th>
+            <th>Margin impact (EUR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {PRICING_ACTION_DETAIL.map((row) => {
+            const showGroup = !seenGroups[row.group];
+            seenGroups[row.group] = true;
+            return (
+              <tr className={`${row.isTotal ? "dashboardTable__totalRow" : ""} ${row.isNet ? "dashboardTable__netRow" : ""} ${row.startsGroup ? "dashboardTable__groupStart" : ""}`} key={`${row.group}-${row.action}`}>
+                {showGroup ? (
+                  <th className={`dashboardTable__typeCell dashboardTable__typeCell--${row.tone}`} rowSpan={groupCounts[row.group]}>
+                    <span className={`pricingSummary__actionDot pricingSummary__actionDot--${row.tone}`} />
+                    {row.group}
+                  </th>
+                ) : null}
+                <th className="dashboardTable__actionCell">{row.action}</th>
+                <td>{row.day30.skus}</td>
+                <td>{row.day30.share}</td>
+                <td><ImpactValue value={row.day30.rotation} /></td>
+                <td><ImpactValue value={row.day30.revenue} /></td>
+                <td><ImpactValue value={row.day30.margin} /></td>
+                <td className="dashboardTable__today">{row.day60.skus}</td>
+                <td>{row.day60.share}</td>
+                <td><ImpactValue value={row.day60.rotation} /></td>
+                <td><ImpactValue value={row.day60.revenue} /></td>
+                <td><ImpactValue value={row.day60.margin} /></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </DashboardSection>
   );
 }
 
@@ -762,46 +1240,14 @@ function RecommendationsPage({ type = "", onOpen }) {
 function OverviewPage({ onOpen, onOpenAppliedAction }) {
   return (
     <>
-      <KpiRow />
-      <PricingActionsSummary />
-      <div className="mid">
-        <section className="panel">
-          <div className="panel__head">
-            <div className="panel__title">Transition Matrix (SKU Count)</div>
-            <div className="panel__hint"><span className="muted">Rows:</span> Proposed strategy <span className="dot sep">&bull;</span> <span className="muted">Columns:</span> Current price level</div>
-          </div>
-          <div className="panel__body"><TransitionMatrix /></div>
-        </section>
-        <aside className="impact">
-          <div className="panel">
-            <div className="panel__head"><div className="panel__title">Season status</div></div>
-            <div className="panel__body"><ImpactTiles /></div>
-          </div>
-        </aside>
-      </div>
+      <WeeklyDashboardOverview />
+      <SeasonStatusSummary />
       <section className="panel">
         <div className="panel__head">
-          <div className="panel__title">Applied Actions</div>
-          <div className="panel__hint">Actions already executed, measured against post-action sales, revenue, margin, and updated inventory risk.</div>
+          <div className="panel__title panel__title--dashboard">Transition matrix</div>
         </div>
-        <div className="panel__body"><AppliedActionsTable onOpen={onOpenAppliedAction} showCategory={false} /></div>
+        <div className="panel__body"><TransitionMatrix /></div>
       </section>
-      <RecommendationTableSection
-        type="markdown"
-        onOpen={onOpen}
-        title="Top Markdown Actions"
-        hint="Highest-priority markdowns ranked by expected margin impact and inventory risk."
-        showCategory={false}
-        showCategoryFilter={false}
-      />
-      <RecommendationTableSection
-        type="markup"
-        onOpen={onOpen}
-        title="Top Markup Actions"
-        hint="Highest-priority markups ranked by expected margin upside."
-        showCategory={false}
-        showCategoryFilter={false}
-      />
     </>
   );
 }
@@ -994,16 +1440,16 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   }
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const yTicks = [0, 25, 50, 75, 100];
-  const pPre = makePath("cur", (point) => point.d <= 60);
-  const pNoChange = makePath("cur", (point) => point.d >= 60);
-  const pScenario = makePath(scenarioKey, (point) => point.d >= 60);
+  const pPre = makePath("cur", (point) => point.d <= CURRENT_DAY);
+  const pNoChange = makePath("cur", (point) => point.d >= CURRENT_DAY);
+  const pScenario = makePath(scenarioKey, (point) => point.d >= CURRENT_DAY);
 
   return (
     <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
       {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
-      <line x1={toX(60)} y1={pad.t} x2={toX(60)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
-      <text x={toX(60) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day 60</text>
+      <line x1={toX(CURRENT_DAY)} y1={pad.t} x2={toX(CURRENT_DAY)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
+      <text x={toX(CURRENT_DAY) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day {CURRENT_DAY}</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {pPre && <path className="chartLineProductPre" d={pPre} />}
@@ -1066,7 +1512,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
               <div className="detailCardBody">
                 <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioColor={selectedScenarioColor} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day 60</div>
+                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day {CURRENT_DAY}</div>
                   <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
                   <div className="legendItem"><span className="legendSwatch productScenario" style={{ "--scenario-color": selectedScenarioColor }} />{scenario.label}</div>
                 </div>
@@ -1117,7 +1563,7 @@ function AppliedSalesChart({ action }) {
   const W = 980;
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
-  const currentDay = 60;
+  const currentDay = CURRENT_DAY;
   const fields = ["actual", "noAction", "noChange", "recommended"];
   const allValues = action.timeline.flatMap((point) => fields.map((field) => point[field]).filter((value) => value != null));
   const maxY = Math.max(100, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
@@ -1143,7 +1589,7 @@ function AppliedSalesChart({ action }) {
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
       <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
       <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
-      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day 60</text>
+      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day {CURRENT_DAY}</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
