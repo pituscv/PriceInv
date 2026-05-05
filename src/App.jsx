@@ -248,8 +248,8 @@ function Sidebar({ activeTab, onNavigate }) {
         ? "recommendations"
       : "overview";
   const recommendationTabs = [
-    ["recommendations-markdown", "Markdowns"],
-    ["recommendations-markup", "Markups"],
+    ["recommendations-markdown", "Markdown"],
+    ["recommendations-markup", "Markup"],
   ];
   const appliedTabs = [
     ["applied-markdown", "Markdowns"],
@@ -288,7 +288,7 @@ function Sidebar({ activeTab, onNavigate }) {
             }}
           >
             <span className="sidebar__icon sidebar__icon--recommendations" />
-            <span>Recommendations</span>
+            <span>Proposed policies</span>
             <span className={`sidebar__disclosure ${openGroups.recommendations ? "is-open" : ""}`} />
           </button>
           {openGroups.recommendations && (
@@ -348,9 +348,9 @@ function PageHeader({ activeTab }) {
   const titles = {
     overview: "Portfolio overview",
     products: "Products",
-    recommendations: "Recommendations",
-    "recommendations-markdown": "Markdown Recommendations",
-    "recommendations-markup": "Markup Recommendations",
+    recommendations: "Proposed policies",
+    "recommendations-markdown": "Proposed markdown policies",
+    "recommendations-markup": "Proposed markup policies",
     "applied-actions": "Applied Actions",
     "applied-markdown": "Applied Markdowns",
     "applied-markup": "Applied Markups",
@@ -396,6 +396,7 @@ function KpiRow() {
 
 function TransitionMatrix({ onOpenCell }) {
   const { cols, rows, values } = MATRIX;
+  const [hoveredCell, setHoveredCell] = useState(null);
   const rowTotals = values.map((row) => row.reduce((s, v) => s + (Number(v) || 0), 0));
   const colTotals = cols.map((_, ci) => values.reduce((s, row) => s + (Number(row[ci]) || 0), 0));
   const offDiagonalValues = values.flatMap((row, ri) => row.map((value, ci) => (ri === ci ? 0 : Number(value) || 0))).filter((value) => value > 0);
@@ -408,13 +409,13 @@ function TransitionMatrix({ onOpenCell }) {
   }
   function policyBandStyle(label) {
     const pct = parseInt(label, 10);
-    const neutral = [190, 198, 207];
-    const markdown = [122, 162, 255];
-    const markup = [66, 217, 200];
+    const neutral = [186, 190, 194];
+    const markdown = [235, 96, 96];
+    const markup = [75, 190, 120];
     const tone = pct < 0
       ? mixColor(neutral, markdown, Math.min(Math.abs(pct) / 60, 1))
       : mixColor(neutral, markup, Math.min(pct / 60, 1));
-    const glow = pct < 0 ? "rgba(122, 162, 255, 0.20)" : pct > 0 ? "rgba(66, 217, 200, 0.20)" : "rgba(234, 242, 255, 0.14)";
+    const glow = pct < 0 ? "rgba(235, 96, 96, 0.20)" : pct > 0 ? "rgba(75, 190, 120, 0.20)" : "rgba(234, 242, 255, 0.14)";
     return {
       "--policy-bg": `linear-gradient(180deg, rgba(${tone[0]}, ${tone[1]}, ${tone[2]}, 0.92), rgba(${tone[0]}, ${tone[1]}, ${tone[2]}, 0.70))`,
       "--policy-glow": glow,
@@ -429,7 +430,7 @@ function TransitionMatrix({ onOpenCell }) {
   return (
     <>
       <div className="table-wrap">
-        <table className="matrix">
+        <table className="matrix" onMouseLeave={() => setHoveredCell(null)}>
           <thead>
             <tr>
               <th className="matrix__axisCorner" colSpan="2" />
@@ -440,7 +441,11 @@ function TransitionMatrix({ onOpenCell }) {
               <th className="matrix__axisSpacer" />
               <th className="rowhdr matrix__rowAxisLabel" />
               {cols.map((col, index) => (
-                <th key={col}>
+                <th
+                  className={`matrix__columnHeader ${hoveredCell?.col === index ? "is-hovered-column" : ""}`}
+                  key={col}
+                  onMouseEnter={() => setHoveredCell({ row: null, col: index })}
+                >
                   <span className={`band band--policy ${index === 0 ? "band--first" : ""} ${index === cols.length - 1 ? "band--last" : ""}`} style={policyBandStyle(col)}>{policyBandLabel(col)}</span>
                 </th>
               ))}
@@ -449,13 +454,13 @@ function TransitionMatrix({ onOpenCell }) {
           </thead>
           <tbody>
             {rows.map((row, ri) => (
-              <tr key={row}>
+              <tr className={hoveredCell?.row === ri ? "is-hovered-row" : ""} key={row}>
                 {ri === 0 && (
                   <th className="matrix__yAxis" rowSpan={rows.length + 1}>
                     <span>Proposed policy week 9</span>
                   </th>
                 )}
-                <th className="rowhdr">
+                <th className={`rowhdr ${hoveredCell?.row === ri ? "is-hovered-row" : ""}`}>
                   <span className={`band band--policy ${ri === 0 ? "band--top" : ""} ${ri === rows.length - 1 ? "band--bottom" : ""}`} style={policyBandStyle(row)}>{policyBandLabel(row)}</span>
                 </th>
                 {values[ri].map((value, ci) => {
@@ -477,8 +482,9 @@ function TransitionMatrix({ onOpenCell }) {
                   const actionClass = isDiagonal ? "matrixCell--diagonal" : rowPct < 0 ? "matrixCell--markdown" : rowPct > 0 ? "matrixCell--markup" : "matrixCell--neutral";
                   return (
                     <td
-                      className={`matrixCell matrixCell--interactive ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""} ${isClickableCell ? "matrixCell--clickable" : ""}`}
+                      className={`matrixCell matrixCell--interactive ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""} ${isClickableCell ? "matrixCell--clickable" : ""} ${hoveredCell?.col === ci ? "is-hovered-column" : ""} ${hoveredCell?.row === ri && hoveredCell?.col === ci ? "is-hovered-cell" : ""}`}
                       key={cols[ci]}
+                      onMouseEnter={() => setHoveredCell({ row: ri, col: ci })}
                       onClick={isClickableCell ? () => onOpenCell?.(clickTarget) : undefined}
                       role={isClickableCell ? "button" : undefined}
                       tabIndex={isClickableCell ? 0 : undefined}
@@ -499,7 +505,15 @@ function TransitionMatrix({ onOpenCell }) {
             ))}
             <tr>
               <th className="rowhdr">Total</th>
-              {colTotals.map((total, i) => <td className="totalCell" key={cols[i]}>{fmtInt(total)}</td>)}
+              {colTotals.map((total, i) => (
+                <td
+                  className={`totalCell ${hoveredCell?.col === i ? "is-hovered-column" : ""}`}
+                  key={cols[i]}
+                  onMouseEnter={() => setHoveredCell({ row: null, col: i })}
+                >
+                  {fmtInt(total)}
+                </td>
+              ))}
               <td />
             </tr>
           </tbody>
@@ -1156,6 +1170,200 @@ function AppliedActionsTable({ onOpen, type = "", categoryFilter = "", showCateg
   return <DataTable rows={rows} columns={columns} onOpen={onOpen} />;
 }
 
+function inferProductCategory(name) {
+  const value = String(name).toLowerCase();
+  if (value.includes("shoe")) return "Footwear";
+  if (
+    value.includes("sock")
+    || value.includes("cap")
+    || value.includes("mat")
+    || value.includes("glove")
+    || value.includes("bag")
+    || value.includes("bottle")
+    || value.includes("headband")
+    || value.includes("sweatband")
+    || value.includes("visor")
+    || value.includes("backpack")
+  ) return "Accessories";
+  return "Clothing";
+}
+
+function exactPctFromPolicy(policy) {
+  const match = String(policy).match(/([-+]?\d+(?:\.\d+)?)%/);
+  return match ? Number(match[1]) / 100 : null;
+}
+
+function dedupeBySku(rows) {
+  const bySku = new Map();
+  rows.forEach((row) => {
+    if (!bySku.has(row.sku)) bySku.set(row.sku, row);
+  });
+  return [...bySku.values()];
+}
+
+function parseMarkdownPolicyRows(rawRows, source) {
+  return rawRows.trim().split("\n").map((line) => {
+    const [name, sku, curr, comp, pctComp, riskW0, policyW8, riskW8, performanceW8, recommendedAction, policyW9, finalPrice, finalPctComp, uplift, revUplift, marginUp] = line.split("|");
+    const proposedPolicy = policyW9 || recommendedAction;
+    return {
+      id: `${source}-${sku}`,
+      name,
+      sku,
+      type: "markdown",
+      category: inferProductCategory(name),
+      curr: Number(curr),
+      comp: Number(comp),
+      pct_comp: Number(pctComp) / 100,
+      inv_risk_pct: Number(riskW0) / 100,
+      policyW8,
+      riskW8: Number(riskW8) / 100,
+      performanceW8,
+      recommendedAction,
+      reco: proposedPolicy,
+      exact_action_pct: proposedPolicy === "Keep markdown" ? null : exactPctFromPolicy(proposedPolicy),
+      obsolete: 0,
+      final_price: Number(finalPrice),
+      final_pct_comp: Number(finalPctComp) / 100,
+      uplift: Number(uplift) / 100,
+      rev_uplift: Number(revUplift),
+      margin_up: Number(marginUp),
+      matrixSource: source,
+    };
+  });
+}
+
+function parseMarkupPolicyRows(rawRows, source) {
+  return rawRows.trim().split("\n").map((line) => {
+    const [name, sku, curr, comp, pctComp, riskW0, policyW8, performanceW8, recommendedAction, policyW9, finalPrice, finalPctComp, uplift, revUplift, marginUp] = line.split("|");
+    return {
+      id: `${source}-${sku}`,
+      name,
+      sku,
+      type: "markup",
+      category: inferProductCategory(name),
+      curr: Number(curr),
+      comp: Number(comp),
+      pct_comp: Number(pctComp) / 100,
+      inv_risk_pct: Number(riskW0) / 100,
+      policyW8,
+      performanceW8,
+      recommendedAction,
+      policyW9,
+      reco: "Mark-up +10%",
+      exact_action_pct: exactPctFromPolicy(policyW9),
+      rot: 1 + (Number(uplift) / 100),
+      final_price: Number(finalPrice),
+      final_pct_comp: Number(finalPctComp) / 100,
+      uplift: Number(uplift) / 100,
+      rev_uplift: Number(revUplift),
+      margin_up: Number(marginUp),
+      matrixSource: source,
+    };
+  });
+}
+
+const MATRIX_ADDITIONAL_MARKDOWN_PRODUCTS = parseMarkdownPolicyRows(`
+Active Training T-Shirt|AT-93847|22.47|20.9|7.5|20.0|Markdown -5.8%|12.0|Not enough|Additional markdown|Markdown -11.4%|19.9|-4.8|30.0|38200|12531
+Sleeveless Training Top|ST-35780|24.54|22.9|7.2|14.0|Markdown -7.6%|9.5|Not enough|Additional markdown|Markdown -18.9%|19.9|-13.1|20.0|15300|5400
+Performance Running Shorts|RS-11234|35.47|31.9|11.2|18.0|Markdown -6.3%|11.5|Not enough|Additional markdown|Markdown -15.7%|29.9|-6.3|25.0|27100|9150
+Lightweight Hoodie|LH-22345|48.05|44.9|7.0|22.0|Markdown -5.4%|14.0|Not enough|Additional markdown|Markdown -12.8%|41.9|-6.7|28.0|44250|15100
+Compression Leggings|GL-33456|40.39|36.9|9.5|19.0|Markdown -5.9%|13.0|Not enough|Additional markdown|Markdown -13.6%|34.9|-5.4|27.0|33950|11200
+Breathable Tank Top|TT-44567|17.49|15.9|10.0|15.0|Markdown -6.7%|10.0|Not enough|Additional markdown|Markdown -14.8%|14.9|-6.3|22.0|10650|3900
+Running Zip Jacket|TZ-55678|55.23|49.9|10.7|25.0|Markdown -8.4%|17.0|Not enough|Additional markdown|Markdown -18.7%|44.9|-10.0|32.0|51200|17300
+Sports Socks Pack|SS-66789|11.31|9.9|14.2|12.0|Markdown -5.2%|8.5|Not enough|Additional markdown|Markdown -12.4%|9.9|0.0|18.0|7600|2600
+Fitness Cap|FC-77890|19.95|17.9|11.5|16.0|Markdown -6.8%|11.0|Not enough|Additional markdown|Markdown -15.3%|16.9|-5.6|21.0|12300|4450
+Yoga Mat|YM-88901|29.77|26.9|10.7|17.0|Markdown -7.2%|12.5|Not enough|Additional markdown|Markdown -16.4%|24.9|-7.4|26.0|20850|7250
+Running Shoes|RS-99012|84.89|79.9|6.2|23.0|Markdown -5.1%|16.0|Not enough|Additional markdown|Markdown -10.6%|75.9|-5.0|29.0|75000|26000
+Sports Bra|SB-10123|27.95|24.9|12.2|14.0|Markdown -6.4%|9.0|Not enough|Additional markdown|Markdown -14.5%|23.9|-4.0|23.0|16750|5600
+Training Shorts|CS-11234|44.78|39.9|12.2|20.0|Markdown -7.3%|14.0|Not enough|Additional markdown|Markdown -17.6%|36.9|-7.5|27.0|30400|10150
+Track Pants|TP-12345|49.83|45.9|8.6|18.0|Markdown -6.2%|12.0|Not enough|Additional markdown|Markdown -13.9%|42.9|-6.5|25.0|36050|12000
+Windbreaker Jacket|WJ-13456|65.23|59.9|8.9|21.0|Markdown -7.5%|15.0|Not enough|Additional markdown|Markdown -15.8%|54.9|-8.3|28.0|47700|16250
+Training Gloves|TG-14567|13.87|12.9|7.5|13.0|Markdown -6.6%|9.0|Not enough|Additional markdown|Markdown -14.2%|11.9|-7.8|20.0|9450|3250
+Gym Bag|GB-15678|37.77|34.9|8.2|17.0|Markdown -5.7%|11.5|Not enough|Additional markdown|Markdown -12.9%|32.9|-5.7|24.0|23600|8000
+Water Bottle|WB-16789|9.04|8.9|1.6|12.0|Markdown -5.3%|8.0|Not enough|Additional markdown|Markdown -12.6%|7.9|-11.2|19.0|6250|2150
+Headband|HB-17890|7.83|6.9|13.5|10.0|Markdown -5.5%|7.0|Not enough|Additional markdown|Markdown -11.8%|6.9|0.0|15.0|4600|1550
+Ankle Socks|AS-18901|5.50|4.9|12.2|11.0|Markdown -5.1%|7.5|Not enough|Additional markdown|Markdown -10.9%|4.9|0.0|14.0|4350|1450
+Sweatband|SB-19012|7.91|7.9|0.1|12.0|Markdown -5.9%|8.5|Not enough|Additional markdown|Markdown -12.7%|6.9|-12.7|16.0|5400|1800
+`, "Additional markdown");
+
+const MATRIX_KEEP_MARKDOWN_PRODUCTS = parseMarkdownPolicyRows(`
+Performance Running Shorts|RS-11234|30.87|29.9|3.2|18.0|Markdown -12.9%|1.8|Working as expected|Keep markdown|Keep markdown|26.9|-10.0|18.0|15200|5200
+Lightweight Training Hoodie|LH-22345|46.29|43.9|5.4|16.5|Markdown -11.6%|2.2|Working as expected|Keep markdown|Keep markdown|40.9|-6.8|17.0|16800|5600
+Gym Compression Leggings|GL-33456|37.05|35.9|3.2|14.0|Markdown -11.2%|1.5|Working as expected|Keep markdown|Keep markdown|32.9|-8.4|16.0|12400|4100
+Breathable Tank Top|TT-44567|17.79|17.9|-0.6|13.5|Markdown -10.6%|2.1|Working as expected|Keep markdown|Keep markdown|15.9|-11.2|15.0|9800|3300
+Training Zip Jacket|TZ-55678|54.83|51.9|5.6|21.0|Markdown -10.8%|1.6|Working as expected|Keep markdown|Keep markdown|48.9|-5.8|20.0|22400|7400
+Sports Socks Pack|SS-66789|9.95|9.9|0.5|12.0|Markdown -10.6%|0.9|Working as expected|Keep markdown|Keep markdown|8.9|-10.1|14.0|7600|2600
+Fitness Cap|FC-77890|18.25|17.9|2.0|15.0|Markdown -12.9%|1.8|Working as expected|Keep markdown|Keep markdown|15.9|-11.2|16.0|12300|4450
+Yoga Mat|YM-88901|26.90|25.9|3.9|17.0|Markdown -11.2%|2.3|Working as expected|Keep markdown|Keep markdown|23.9|-7.7|17.0|20850|7250
+Running Shoes|RS-99012|82.02|78.9|4.0|20.0|Markdown -11.1%|2.1|Working as expected|Keep markdown|Keep markdown|72.9|-7.6|19.0|75000|26000
+Sports Bra|SB-10123|25.43|24.9|2.1|14.0|Markdown -13.9%|1.3|Working as expected|Keep markdown|Keep markdown|21.9|-12.0|15.0|16750|5600
+Cycling Shorts|CS-11234|42.45|39.9|6.4|19.0|Markdown -10.7%|1.9|Working as expected|Keep markdown|Keep markdown|37.9|-5.0|19.0|30400|10150
+Track Pants|TP-12345|48.18|45.9|5.0|18.0|Markdown -11.0%|1.3|Working as expected|Keep markdown|Keep markdown|42.9|-6.5|18.0|36050|12000
+Windbreaker Jacket|WJ-13456|63.69|59.9|6.3|21.0|Markdown -10.7%|2.6|Working as expected|Keep markdown|Keep markdown|56.9|-5.0|20.0|47700|16250
+Training Gloves|TG-14567|13.12|12.4|5.8|13.0|Markdown -16.9%|0.9|Working as expected|Keep markdown|Keep markdown|10.9|-12.1|14.0|9450|3250
+Gym Bag|GB-15678|36.73|34.9|5.2|17.0|Markdown -10.4%|1.5|Working as expected|Keep markdown|Keep markdown|32.9|-5.7|17.0|23600|8000
+Water Bottle|WB-16789|8.34|8.9|-6.3|12.0|Markdown -17.3%|1.3|Working as expected|Keep markdown|Keep markdown|6.9|-22.5|13.0|6250|2150
+Headband|HB-17890|6.21|6.9|-10.0|10.0|Markdown -14.7%|1.6|Working as expected|Keep markdown|Keep markdown|5.3|-23.2|12.0|4600|1550
+Ankle Socks|AS-18901|4.72|4.9|-3.7|11.0|Markdown -17.4%|0.9|Working as expected|Keep markdown|Keep markdown|3.9|-20.4|12.0|4350|1450
+Sweatband|SB-19012|7.57|7.9|-4.2|12.0|Markdown -15.5%|1.5|Working as expected|Keep markdown|Keep markdown|6.4|-19.0|13.0|5400|1800
+Thermal Running Top|RT-20123|32.66|31.9|2.4|16.0|Markdown -11.5%|1.7|Working as expected|Keep markdown|Keep markdown|28.9|-9.4|17.0|15000|5000
+Padded Training Vest|TV-21234|58.15|54.9|5.9|19.5|Markdown -10.7%|2.9|Working as expected|Keep markdown|Keep markdown|51.9|-5.5|19.0|38400|12800
+Seamless Training Top|ST-22345|23.70|21.9|8.2|14.5|Markdown -10.2%|0.3|Working as expected|Keep markdown|Keep markdown|21.3|-2.7|15.0|11800|3900
+Long Sleeve Base Layer|BL-23456|30.65|28.9|6.0|15.5|Markdown -11.0%|2.6|Working as expected|Keep markdown|Keep markdown|27.3|-5.5|16.0|14200|4700
+Lightweight Running Jacket|LJ-24567|69.86|65.9|6.0|22.0|Markdown -10.2%|0.9|Working as expected|Keep markdown|Keep markdown|62.9|-4.6|20.0|49800|16900
+Training Crew Socks|TC-25678|11.01|10.4|5.9|12.5|Markdown -10.1%|1.5|Working as expected|Keep markdown|Keep markdown|9.9|-4.8|13.0|7100|2450
+Athletic Polo Shirt|AP-26789|29.71|27.9|6.5|16.0|Markdown -10.1%|1.3|Working as expected|Keep markdown|Keep markdown|26.9|-3.6|16.0|15300|5100
+Running Visor|RV-27890|15.97|14.9|7.2|11.5|Markdown -10.2%|1.6|Working as expected|Keep markdown|Keep markdown|14.3|-4.0|13.0|6900|2300
+Training Backpack|TB-28901|43.37|40.9|6.0|18.0|Markdown -10.2%|1.5|Working as expected|Keep markdown|Keep markdown|38.9|-4.9|18.0|27500|9300
+Quick Dry T-Shirt|QT-29012|20.54|18.9|8.7|13.5|Markdown -10.2%|2.1|Working as expected|Keep markdown|Keep markdown|18.4|-2.6|14.0|10200|3400
+Training Sweatshirt|TS-30123|41.41|38.9|6.5|17.5|Markdown -10.2%|1.6|Working as expected|Keep markdown|Keep markdown|37.2|-4.4|17.0|22100|7400
+Performance Joggers|PJ-31234|47.66|44.9|6.1|18.5|Markdown -10.2%|0.9|Working as expected|Keep markdown|Keep markdown|42.8|-4.7|18.0|28900|9700
+`, "Keep markdown");
+
+const MATRIX_NEW_MARKUP_PRODUCTS = parseMarkupPolicyRows(`
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-0.45|8.0|18500|9200
+Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
+Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
+Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
+Lightweight Sports Hoodie|LH-66109|52.90|59.90|-11.7|8.0|None|Sell through +9pp vs expected|Increase price|Markup +11.3%|58.9|-1.7|8.0|19800|9800
+Performance Polo|PP-77465|39.90|44.90|-11.1|7.0|None|Sell through +7pp vs expected|Increase price|Markup +10.3%|43.9|-2.2|7.0|15000|7500
+Compression Shorts|CS-83920|29.90|34.90|-14.3|6.5|None|Sell through +8pp vs expected|Increase price|Markup +13.4%|33.9|-2.9|6.5|14200|7100
+Active Training T-Shirt|AT-93847|21.90|24.90|-12.0|7.5|None|Sell through +9pp vs expected|Increase price|Markup +13.7%|24.9|0.0|7.0|12000|6000
+High-Waist Leggings|HL-80426|44.90|49.90|-10.0|8.0|None|Sell through +8pp vs expected|Increase price|Markup +11.1%|49.9|0.0|8.0|17500|8800
+Thermal Sports Jacket|TJ-46813|66.90|74.90|-10.7|9.5|None|Sell through +11pp vs expected|Increase price|Markup +11.9%|74.9|0.0|9.0|26000|13000
+`, "New markup");
+
+const MATRIX_EXISTING_MARKUP_PRODUCTS = [{
+  id: "Existing markup-RS-71058",
+  name: "Basic Running Shoes",
+  sku: "RS-71058",
+  type: "markup",
+  category: "Footwear",
+  curr: 88.9,
+  comp: 98.9,
+  pct_comp: -0.1,
+  rot: 1.82,
+  policyW8: "Mark-up +10.1%",
+  performanceW8: "Sell through +82pp vs expected",
+  recommendedAction: "Keep markup",
+  policyW9: "Markup +10.1%",
+  reco: "Mark-up +10%",
+  exact_action_pct: 0.101,
+  final_price: 97.9,
+  final_pct_comp: -0.01,
+  uplift: 0.1,
+  rev_uplift: 29300,
+  margin_up: 29300,
+  matrixSource: "Existing markup",
+}];
+
+const PROPOSED_MARKDOWN_PRODUCTS = [...MATRIX_ADDITIONAL_MARKDOWN_PRODUCTS, ...MATRIX_KEEP_MARKDOWN_PRODUCTS]
+  .sort((a, b) => (Number(b.margin_up) || 0) - (Number(a.margin_up) || 0));
+const PROPOSED_MARKUP_PRODUCTS = [...MATRIX_NEW_MARKUP_PRODUCTS, ...MATRIX_EXISTING_MARKUP_PRODUCTS]
+  .sort((a, b) => (Number(b.margin_up) || 0) - (Number(a.margin_up) || 0));
+const MATRIX_PRODUCT_LIST = dedupeBySku([...PROPOSED_MARKDOWN_PRODUCTS, ...PROPOSED_MARKUP_PRODUCTS])
+  .sort((a, b) => a.name.localeCompare(b.name));
+
 function getRecommendationRows(type) {
   if (type === "markdown") {
     return [...MARKDOWN_LIST]
@@ -1167,6 +1375,12 @@ function getRecommendationRows(type) {
       .sort((a, b) => (Number(b.margin_up) || 0) - (Number(a.margin_up) || 0))
       .map((product) => ({ ...product, type: "markup" }));
   }
+  return [];
+}
+
+function getProposedPolicyRows(type) {
+  if (type === "markdown") return PROPOSED_MARKDOWN_PRODUCTS;
+  if (type === "markup") return PROPOSED_MARKUP_PRODUCTS;
   return [];
 }
 
@@ -1202,7 +1416,7 @@ function getRecommendationColumns(type, rows, showCategory = true) {
 
 function RecommendationTableSection({ type, onOpen, title, hint, showCategory = true, showCategoryFilter = true }) {
   const [categoryFilter, setCategoryFilter] = useState("");
-  const rows = getRecommendationRows(type).filter((row) => !categoryFilter || row.category === categoryFilter);
+  const rows = getProposedPolicyRows(type).filter((row) => !categoryFilter || row.category === categoryFilter);
   const columns = getRecommendationColumns(type, rows, showCategory);
   return (
     <section className="panel">
@@ -1505,8 +1719,8 @@ function RecommendationsPage({ type = "", onOpen }) {
       <RecommendationTableSection
         type="markdown"
         onOpen={onOpen}
-        title="Markdown Recommendations"
-        hint="Priority markdown actions ranked by expected margin impact and inventory risk."
+        title="Proposed Markdown Policies"
+        hint="Markdown policies from the matrix drilldowns, ranked by expected margin impact and inventory risk."
       />
     );
   }
@@ -1515,8 +1729,8 @@ function RecommendationsPage({ type = "", onOpen }) {
       <RecommendationTableSection
         type="markup"
         onOpen={onOpen}
-        title="Markup Recommendations"
-        hint="Priority markup actions ranked by expected margin upside."
+        title="Proposed Markup Policies"
+        hint="Markup policies from the matrix drilldowns, ranked by expected margin upside."
       />
     );
   }
@@ -1525,14 +1739,14 @@ function RecommendationsPage({ type = "", onOpen }) {
       <RecommendationTableSection
         type="markdown"
         onOpen={onOpen}
-        title="Markdown Recommendations"
-        hint="Priority markdown actions ranked by expected margin impact and inventory risk."
+        title="Proposed Markdown Policies"
+        hint="Markdown policies from the matrix drilldowns, ranked by expected margin impact and inventory risk."
       />
       <RecommendationTableSection
         type="markup"
         onOpen={onOpen}
-        title="Markup Recommendations"
-        hint="Priority markup actions ranked by expected margin upside."
+        title="Proposed Markup Policies"
+        hint="Markup policies from the matrix drilldowns, ranked by expected margin upside."
       />
     </>
   );
@@ -1579,7 +1793,7 @@ function AppliedActionsPage({ onOpenAppliedAction, type = "" }) {
 }
 
 function ProductListPage({ typeFilter, categoryFilter, search, onTypeChange, onCategoryChange, onSearchChange, onOpen }) {
-  const filtered = useMemo(() => ALL_PRODUCTS.filter((row) => {
+  const filtered = useMemo(() => MATRIX_PRODUCT_LIST.filter((row) => {
     if (typeFilter && row.type !== typeFilter) return false;
     if (categoryFilter && row.category !== categoryFilter) return false;
     if (!search) return true;
@@ -1590,6 +1804,7 @@ function ProductListPage({ typeFilter, categoryFilter, search, onTypeChange, onC
     { key: "sku", label: "SKU" }, { key: "name", label: "Name" },
     { key: "category", label: "Category", render: (value) => <CategoryChip value={value} /> },
     { key: "type", label: "Type", render: (v) => <span className="pill"><span className="dot" />{v}</span> },
+    { key: "matrixSource", label: "Matrix status", render: (value) => <StatusChip value={value} tone={value === "Additional markdown" ? "warn" : "good"} /> },
     { key: "reco", label: "Recommendation", render: (_, row) => <RecoChipForProduct product={row} /> },
     { key: "curr", label: "Current price (EUR)", align: "num", render: fmtEUR },
     { key: "final_price", label: "Final price (EUR)", align: "num", render: fmtEUR },
@@ -1600,7 +1815,7 @@ function ProductListPage({ typeFilter, categoryFilter, search, onTypeChange, onC
       <div className="panel__head panel__head--split">
         <div>
           <div className="panel__title">Product List</div>
-          <div className="panel__hint">Click any row to open Product Detail.</div>
+          <div className="panel__hint">All products available from the matrix drilldowns.</div>
         </div>
         <div className="filters">
           <select className="select" value={typeFilter} onChange={(event) => onTypeChange(event.target.value)}>
@@ -1617,7 +1832,7 @@ function ProductListPage({ typeFilter, categoryFilter, search, onTypeChange, onC
       </div>
       <div className="panel__body">
         <DataTable rows={filtered} columns={columns} onOpen={onOpen} />
-        <div className="footnote">{filtered.length} of {ALL_PRODUCTS.length} products shown.</div>
+        <div className="footnote">{filtered.length} of {MATRIX_PRODUCT_LIST.length} products shown.</div>
       </div>
     </section>
   );
