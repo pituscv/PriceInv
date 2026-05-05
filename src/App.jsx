@@ -86,6 +86,10 @@ function getCompactScenarioLabel(label) {
     .replace(/^Mark-up\s+/i, "");
 }
 
+function getScenarioHeaderLabel(label) {
+  return String(label).replace(/\s*\(Recommended\)\s*/i, "");
+}
+
 function RecoChipForProduct({ product }) {
   return <RecoChip value={getExactActionLabel(product)} colorKey={product.reco} />;
 }
@@ -342,7 +346,7 @@ function Sidebar({ activeTab, onNavigate }) {
 
 function PageHeader({ activeTab }) {
   const titles = {
-    overview: "Dashboard",
+    overview: "Portfolio overview",
     products: "Products",
     recommendations: "Recommendations",
     "recommendations-markdown": "Markdown Recommendations",
@@ -353,6 +357,8 @@ function PageHeader({ activeTab }) {
     detail: "Product Detail",
     "applied-detail": "Applied Action Detail",
     "matrix-detail": "Matrix Detail",
+    "matrix-keep-markdown-detail": "Matrix Detail",
+    "matrix-new-markup-detail": "Matrix Detail",
     "matrix-markup-detail": "Matrix Detail",
   };
 
@@ -459,15 +465,19 @@ function TransitionMatrix({ onOpenCell }) {
                   const isZero = n === 0;
                   const clickTarget = row === "-20%" && cols[ci] === "-10%" && n === 21
                     ? "markdown"
-                    : row === "+10%" && cols[ci] === "+10%" && n === 142
-                      ? "markup"
-                      : null;
+                    : row === "-20%" && cols[ci] === "-20%" && n === 557
+                      ? "keepMarkdown"
+                      : row === "+20%" && cols[ci] === "0%" && n === 10
+                        ? "newMarkup"
+                        : row === "+10%" && cols[ci] === "+10%" && n === 142
+                          ? "markup"
+                          : null;
                   const isClickableCell = Boolean(clickTarget);
                   const alpha = isZero ? 0 : isDiagonal ? 0.18 : clamp(Math.log1p(n) / Math.log1p(heatMax), 0.08, 1);
                   const actionClass = isDiagonal ? "matrixCell--diagonal" : rowPct < 0 ? "matrixCell--markdown" : rowPct > 0 ? "matrixCell--markup" : "matrixCell--neutral";
                   return (
                     <td
-                      className={`matrixCell ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""} ${isClickableCell ? "matrixCell--clickable" : ""}`}
+                      className={`matrixCell matrixCell--interactive ${actionClass} ${!isDiagonal && !isZero ? "matrixCell--action" : ""} ${isClickableCell ? "matrixCell--clickable" : ""}`}
                       key={cols[ci]}
                       onClick={isClickableCell ? () => onOpenCell?.(clickTarget) : undefined}
                       role={isClickableCell ? "button" : undefined}
@@ -480,7 +490,7 @@ function TransitionMatrix({ onOpenCell }) {
                       } : undefined}
                       style={{ "--heat": alpha }}
                     >
-                      {n > 0 ? fmtInt(n) : ""}
+                      {fmtInt(n)}
                     </td>
                   );
                 })}
@@ -1216,42 +1226,51 @@ function RecommendationTableSection({ type, onOpen, title, hint, showCategory = 
 }
 
 function MatrixDetailPage({ onOpen, onBack }) {
-  const matrixDetailSkus = ["AT-93847", "ST-35780"];
-  const matrixDetailOverrides = {
-    "AT-93847": {
-      rev_uplift: 456400,
-      margin_up: 75062,
-      final_pct_comp: -0.05,
-    },
-  };
-  const recommendationRows = getRecommendationRows("markdown");
-  const rows = matrixDetailSkus
-    .map((sku) => recommendationRows.find((row) => row.sku === sku))
-    .filter(Boolean)
-    .map((row) => {
-      const merged = { ...row, ...(matrixDetailOverrides[row.sku] || {}) };
-      return {
-        ...merged,
-        final_pct_comp: merged.final_pct_comp ?? (Number(merged.comp) ? (Number(merged.final_price) - Number(merged.comp)) / Number(merged.comp) : null),
-      };
-    });
+  const rows = [
+    { name: "Active Training T-Shirt", sku: "AT-93847", curr: 22.47, comp: 20.9, pct_comp: 0.075, inv_risk_pct: 0.2, policyW8: "Markdown -5.8%", riskW8: 0.12, performanceW8: "Not enough", reco: "Markdown -11.4%", exact_action_pct: -0.114, obsolete: 0, final_price: 19.9, final_pct_comp: -0.048, uplift: 0.3, rev_uplift: 38200, margin_up: 12531 },
+    { name: "Sleeveless Training Top", sku: "ST-35780", curr: 24.54, comp: 22.9, pct_comp: 0.072, inv_risk_pct: 0.14, policyW8: "Markdown -7.6%", riskW8: 0.095, performanceW8: "Not enough", reco: "Markdown -18.9%", exact_action_pct: -0.189, obsolete: 0, final_price: 19.9, final_pct_comp: -0.131, uplift: 0.2, rev_uplift: 15300, margin_up: 5400 },
+    { name: "Performance Running Shorts", sku: "RS-11234", curr: 35.47, comp: 31.9, pct_comp: 0.112, inv_risk_pct: 0.18, policyW8: "Markdown -6.3%", riskW8: 0.115, performanceW8: "Not enough", reco: "Markdown -15.7%", exact_action_pct: -0.157, obsolete: 0, final_price: 29.9, final_pct_comp: -0.063, uplift: 0.25, rev_uplift: 27100, margin_up: 9150 },
+    { name: "Lightweight Hoodie", sku: "LH-22345", curr: 48.05, comp: 44.9, pct_comp: 0.07, inv_risk_pct: 0.22, policyW8: "Markdown -5.4%", riskW8: 0.14, performanceW8: "Not enough", reco: "Markdown -12.8%", exact_action_pct: -0.128, obsolete: 0, final_price: 41.9, final_pct_comp: -0.067, uplift: 0.28, rev_uplift: 44250, margin_up: 15100 },
+    { name: "Compression Leggings", sku: "GL-33456", curr: 40.39, comp: 36.9, pct_comp: 0.095, inv_risk_pct: 0.19, policyW8: "Markdown -5.9%", riskW8: 0.13, performanceW8: "Not enough", reco: "Markdown -13.6%", exact_action_pct: -0.136, obsolete: 0, final_price: 34.9, final_pct_comp: -0.054, uplift: 0.27, rev_uplift: 33950, margin_up: 11200 },
+    { name: "Breathable Tank Top", sku: "TT-44567", curr: 17.49, comp: 15.9, pct_comp: 0.1, inv_risk_pct: 0.15, policyW8: "Markdown -6.7%", riskW8: 0.1, performanceW8: "Not enough", reco: "Markdown -14.8%", exact_action_pct: -0.148, obsolete: 0, final_price: 14.9, final_pct_comp: -0.063, uplift: 0.22, rev_uplift: 10650, margin_up: 3900 },
+    { name: "Running Zip Jacket", sku: "TZ-55678", curr: 55.23, comp: 49.9, pct_comp: 0.107, inv_risk_pct: 0.25, policyW8: "Markdown -8.4%", riskW8: 0.17, performanceW8: "Not enough", reco: "Markdown -18.7%", exact_action_pct: -0.187, obsolete: 0, final_price: 44.9, final_pct_comp: -0.1, uplift: 0.32, rev_uplift: 51200, margin_up: 17300 },
+    { name: "Sports Socks Pack", sku: "SS-66789", curr: 11.31, comp: 9.9, pct_comp: 0.142, inv_risk_pct: 0.12, policyW8: "Markdown -5.2%", riskW8: 0.085, performanceW8: "Not enough", reco: "Markdown -12.4%", exact_action_pct: -0.124, obsolete: 0, final_price: 9.9, final_pct_comp: 0, uplift: 0.18, rev_uplift: 7600, margin_up: 2600 },
+    { name: "Fitness Cap", sku: "FC-77890", curr: 19.95, comp: 17.9, pct_comp: 0.115, inv_risk_pct: 0.16, policyW8: "Markdown -6.8%", riskW8: 0.11, performanceW8: "Not enough", reco: "Markdown -15.3%", exact_action_pct: -0.153, obsolete: 0, final_price: 16.9, final_pct_comp: -0.056, uplift: 0.21, rev_uplift: 12300, margin_up: 4450 },
+    { name: "Yoga Mat", sku: "YM-88901", curr: 29.77, comp: 26.9, pct_comp: 0.107, inv_risk_pct: 0.17, policyW8: "Markdown -7.2%", riskW8: 0.125, performanceW8: "Not enough", reco: "Markdown -16.4%", exact_action_pct: -0.164, obsolete: 0, final_price: 24.9, final_pct_comp: -0.074, uplift: 0.26, rev_uplift: 20850, margin_up: 7250 },
+    { name: "Running Shoes", sku: "RS-99012", curr: 84.89, comp: 79.9, pct_comp: 0.062, inv_risk_pct: 0.23, policyW8: "Markdown -5.1%", riskW8: 0.16, performanceW8: "Not enough", reco: "Markdown -10.6%", exact_action_pct: -0.106, obsolete: 0, final_price: 75.9, final_pct_comp: -0.05, uplift: 0.29, rev_uplift: 75000, margin_up: 26000 },
+    { name: "Sports Bra", sku: "SB-10123", curr: 27.95, comp: 24.9, pct_comp: 0.122, inv_risk_pct: 0.14, policyW8: "Markdown -6.4%", riskW8: 0.09, performanceW8: "Not enough", reco: "Markdown -14.5%", exact_action_pct: -0.145, obsolete: 0, final_price: 23.9, final_pct_comp: -0.04, uplift: 0.23, rev_uplift: 16750, margin_up: 5600 },
+    { name: "Training Shorts", sku: "CS-11234", curr: 44.78, comp: 39.9, pct_comp: 0.122, inv_risk_pct: 0.2, policyW8: "Markdown -7.3%", riskW8: 0.14, performanceW8: "Not enough", reco: "Markdown -17.6%", exact_action_pct: -0.176, obsolete: 0, final_price: 36.9, final_pct_comp: -0.075, uplift: 0.27, rev_uplift: 30400, margin_up: 10150 },
+    { name: "Track Pants", sku: "TP-12345", curr: 49.83, comp: 45.9, pct_comp: 0.086, inv_risk_pct: 0.18, policyW8: "Markdown -6.2%", riskW8: 0.12, performanceW8: "Not enough", reco: "Markdown -13.9%", exact_action_pct: -0.139, obsolete: 0, final_price: 42.9, final_pct_comp: -0.065, uplift: 0.25, rev_uplift: 36050, margin_up: 12000 },
+    { name: "Windbreaker Jacket", sku: "WJ-13456", curr: 65.23, comp: 59.9, pct_comp: 0.089, inv_risk_pct: 0.21, policyW8: "Markdown -7.5%", riskW8: 0.15, performanceW8: "Not enough", reco: "Markdown -15.8%", exact_action_pct: -0.158, obsolete: 0, final_price: 54.9, final_pct_comp: -0.083, uplift: 0.28, rev_uplift: 47700, margin_up: 16250 },
+    { name: "Training Gloves", sku: "TG-14567", curr: 13.87, comp: 12.9, pct_comp: 0.075, inv_risk_pct: 0.13, policyW8: "Markdown -6.6%", riskW8: 0.09, performanceW8: "Not enough", reco: "Markdown -14.2%", exact_action_pct: -0.142, obsolete: 0, final_price: 11.9, final_pct_comp: -0.078, uplift: 0.2, rev_uplift: 9450, margin_up: 3250 },
+    { name: "Gym Bag", sku: "GB-15678", curr: 37.77, comp: 34.9, pct_comp: 0.082, inv_risk_pct: 0.17, policyW8: "Markdown -5.7%", riskW8: 0.115, performanceW8: "Not enough", reco: "Markdown -12.9%", exact_action_pct: -0.129, obsolete: 0, final_price: 32.9, final_pct_comp: -0.057, uplift: 0.24, rev_uplift: 23600, margin_up: 8000 },
+    { name: "Water Bottle", sku: "WB-16789", curr: 9.04, comp: 8.9, pct_comp: 0.016, inv_risk_pct: 0.12, policyW8: "Markdown -5.3%", riskW8: 0.08, performanceW8: "Not enough", reco: "Markdown -12.6%", exact_action_pct: -0.126, obsolete: 0, final_price: 7.9, final_pct_comp: -0.112, uplift: 0.19, rev_uplift: 6250, margin_up: 2150 },
+    { name: "Headband", sku: "HB-17890", curr: 7.83, comp: 6.9, pct_comp: 0.135, inv_risk_pct: 0.1, policyW8: "Markdown -5.5%", riskW8: 0.07, performanceW8: "Not enough", reco: "Markdown -11.8%", exact_action_pct: -0.118, obsolete: 0, final_price: 6.9, final_pct_comp: 0, uplift: 0.15, rev_uplift: 4600, margin_up: 1550 },
+    { name: "Ankle Socks", sku: "AS-18901", curr: 5.5, comp: 4.9, pct_comp: 0.122, inv_risk_pct: 0.11, policyW8: "Markdown -5.1%", riskW8: 0.075, performanceW8: "Not enough", reco: "Markdown -10.9%", exact_action_pct: -0.109, obsolete: 0, final_price: 4.9, final_pct_comp: 0, uplift: 0.14, rev_uplift: 4350, margin_up: 1450 },
+    { name: "Sweatband", sku: "SB-19012", curr: 7.91, comp: 7.9, pct_comp: 0.001, inv_risk_pct: 0.12, policyW8: "Markdown -5.9%", riskW8: 0.085, performanceW8: "Not enough", reco: "Markdown -12.7%", exact_action_pct: -0.127, obsolete: 0, final_price: 6.9, final_pct_comp: -0.127, uplift: 0.16, rev_uplift: 5400, margin_up: 1800 },
+  ].map((row) => ({ ...row, type: "markdown" }));
   const revMax = Math.max(...rows.map((row) => Number(row.rev_uplift) || 0), 1);
   const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
   const riskMax = Math.max(...rows.map((row) => Number(row.inv_risk_pct) || 0), 1);
+  const riskW8Max = Math.max(...rows.map((row) => Number(row.riskW8) || 0), 1);
+  const fmtMoneyNumber = (value) => value == null || Number.isNaN(Number(value)) ? "-" : Number(value).toLocaleString("en-US", { minimumFractionDigits: String(value).includes(".") ? Math.min(String(value).split(".")[1].length, 2) : 0, maximumFractionDigits: 2 });
   const columns = [
     { key: "name", label: "Name" },
     { key: "sku", label: "SKU" },
-    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtEUR },
-    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtEUR },
+    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtMoneyNumber },
     { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
-    { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: riskMax },
-    { key: "reco", label: "Policy", render: (_, row) => <RecoChipForProduct product={row} /> },
-    { key: "final_price", label: "Final (EUR)", align: "num", render: fmtEUR },
+    { key: "inv_risk_pct", label: "Inventory at risk W0", align: "num", render: fmtPct, cellClass: "riskCell", max: riskMax },
+    { key: "policyW8", label: "Policy W8" },
+    { key: "riskW8", label: "Inventory at risk W8", align: "num", render: fmtPct, cellClass: "riskCell", max: riskW8Max },
+    { key: "performanceW8", label: "W8 performance" },
+    { key: "reco", label: "Policy W9 (proposed)", render: (_, row) => <RecoChipForProduct product={row} /> },
+    { key: "obsolete", label: "Inventory at risk end of season", align: "num", render: fmtPct },
+    { key: "final_price", label: "Price W9 (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtIndex },
     { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
-    { key: "obsolete", label: "Obsolete post", align: "num", render: fmtPct },
     { key: "rev_uplift", label: "Revenue Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: revMax },
     { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
-    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtIndex },
   ];
   return (
     <section className="panel">
@@ -1264,7 +1283,100 @@ function MatrixDetailPage({ onOpen, onBack }) {
       </div>
       <div className="panel__body">
         <DataTable rows={rows} columns={columns} onOpen={onOpen} />
-        <div className="footnote">{rows.length} products shown from Top Markdowns.</div>
+        <div className="footnote">{rows.length} products shown from the selected matrix transition.</div>
+      </div>
+    </section>
+  );
+}
+
+function MatrixKeepMarkdownDetailPage({ onOpen, onBack }) {
+  const rows = `
+Performance Running Shorts|RS-11234|30.87|29.9|3.2|18.0|Markdown -12.9%|1.8|Working as expected|Keep markdown|26.9|-10.0|18.0|15200|5200
+Lightweight Training Hoodie|LH-22345|46.29|43.9|5.4|16.5|Markdown -11.6%|2.2|Working as expected|Keep markdown|40.9|-6.8|17.0|16800|5600
+Gym Compression Leggings|GL-33456|37.05|35.9|3.2|14.0|Markdown -11.2%|1.5|Working as expected|Keep markdown|32.9|-8.4|16.0|12400|4100
+Breathable Tank Top|TT-44567|17.79|17.9|-0.6|13.5|Markdown -10.6%|2.1|Working as expected|Keep markdown|15.9|-11.2|15.0|9800|3300
+Training Zip Jacket|TZ-55678|54.83|51.9|5.6|21.0|Markdown -10.8%|1.6|Working as expected|Keep markdown|48.9|-5.8|20.0|22400|7400
+Sports Socks Pack|SS-66789|9.95|9.9|0.5|12.0|Markdown -10.6%|0.9|Working as expected|Keep markdown|8.9|-10.1|14.0|7600|2600
+Fitness Cap|FC-77890|18.25|17.9|2.0|15.0|Markdown -12.9%|1.8|Working as expected|Keep markdown|15.9|-11.2|16.0|12300|4450
+Yoga Mat|YM-88901|26.90|25.9|3.9|17.0|Markdown -11.2%|2.3|Working as expected|Keep markdown|23.9|-7.7|17.0|20850|7250
+Running Shoes|RS-99012|82.02|78.9|4.0|20.0|Markdown -11.1%|2.1|Working as expected|Keep markdown|72.9|-7.6|19.0|75000|26000
+Sports Bra|SB-10123|25.43|24.9|2.1|14.0|Markdown -13.9%|1.3|Working as expected|Keep markdown|21.9|-12.0|15.0|16750|5600
+Cycling Shorts|CS-11234|42.45|39.9|6.4|19.0|Markdown -10.7%|1.9|Working as expected|Keep markdown|37.9|-5.0|19.0|30400|10150
+Track Pants|TP-12345|48.18|45.9|5.0|18.0|Markdown -11.0%|1.3|Working as expected|Keep markdown|42.9|-6.5|18.0|36050|12000
+Windbreaker Jacket|WJ-13456|63.69|59.9|6.3|21.0|Markdown -10.7%|2.6|Working as expected|Keep markdown|56.9|-5.0|20.0|47700|16250
+Training Gloves|TG-14567|13.12|12.4|5.8|13.0|Markdown -16.9%|0.9|Working as expected|Keep markdown|10.9|-12.1|14.0|9450|3250
+Gym Bag|GB-15678|36.73|34.9|5.2|17.0|Markdown -10.4%|1.5|Working as expected|Keep markdown|32.9|-5.7|17.0|23600|8000
+Water Bottle|WB-16789|8.34|8.9|-6.3|12.0|Markdown -17.3%|1.3|Working as expected|Keep markdown|6.9|-22.5|13.0|6250|2150
+Headband|HB-17890|6.21|6.9|-10.0|10.0|Markdown -14.7%|1.6|Working as expected|Keep markdown|5.3|-23.2|12.0|4600|1550
+Ankle Socks|AS-18901|4.72|4.9|-3.7|11.0|Markdown -17.4%|0.9|Working as expected|Keep markdown|3.9|-20.4|12.0|4350|1450
+Sweatband|SB-19012|7.57|7.9|-4.2|12.0|Markdown -15.5%|1.5|Working as expected|Keep markdown|6.4|-19.0|13.0|5400|1800
+Thermal Running Top|RT-20123|32.66|31.9|2.4|16.0|Markdown -11.5%|1.7|Working as expected|Keep markdown|28.9|-9.4|17.0|15000|5000
+Padded Training Vest|TV-21234|58.15|54.9|5.9|19.5|Markdown -10.7%|2.9|Working as expected|Keep markdown|51.9|-5.5|19.0|38400|12800
+Seamless Training Top|ST-22345|23.70|21.9|8.2|14.5|Markdown -10.2%|0.3|Working as expected|Keep markdown|21.3|-2.7|15.0|11800|3900
+Long Sleeve Base Layer|BL-23456|30.65|28.9|6.0|15.5|Markdown -11.0%|2.6|Working as expected|Keep markdown|27.3|-5.5|16.0|14200|4700
+Lightweight Running Jacket|LJ-24567|69.86|65.9|6.0|22.0|Markdown -10.2%|0.9|Working as expected|Keep markdown|62.9|-4.6|20.0|49800|16900
+Training Crew Socks|TC-25678|11.01|10.4|5.9|12.5|Markdown -10.1%|1.5|Working as expected|Keep markdown|9.9|-4.8|13.0|7100|2450
+Athletic Polo Shirt|AP-26789|29.71|27.9|6.5|16.0|Markdown -10.1%|1.3|Working as expected|Keep markdown|26.9|-3.6|16.0|15300|5100
+Running Visor|RV-27890|15.97|14.9|7.2|11.5|Markdown -10.2%|1.6|Working as expected|Keep markdown|14.3|-4.0|13.0|6900|2300
+Training Backpack|TB-28901|43.37|40.9|6.0|18.0|Markdown -10.2%|1.5|Working as expected|Keep markdown|38.9|-4.9|18.0|27500|9300
+Quick Dry T-Shirt|QT-29012|20.54|18.9|8.7|13.5|Markdown -10.2%|2.1|Working as expected|Keep markdown|18.4|-2.6|14.0|10200|3400
+Training Sweatshirt|TS-30123|41.41|38.9|6.5|17.5|Markdown -10.2%|1.6|Working as expected|Keep markdown|37.2|-4.4|17.0|22100|7400
+Performance Joggers|PJ-31234|47.66|44.9|6.1|18.5|Markdown -10.2%|0.9|Working as expected|Keep markdown|42.8|-4.7|18.0|28900|9700
+`.trim().split("\n").map((line) => {
+    const [name, sku, curr, comp, pctComp, riskW0, policyW8, riskW8, performanceW8, recommendedAction, finalPrice, finalPctComp, uplift, revUplift, marginUp] = line.split("|");
+    return {
+      name,
+      sku,
+      type: "markdown",
+      curr: Number(curr),
+      comp: Number(comp),
+      pct_comp: Number(pctComp) / 100,
+      inv_risk_pct: Number(riskW0) / 100,
+      policyW8,
+      riskW8: Number(riskW8) / 100,
+      performanceW8,
+      recommendedAction,
+      final_price: Number(finalPrice),
+      final_pct_comp: Number(finalPctComp) / 100,
+      uplift: Number(uplift) / 100,
+      rev_uplift: Number(revUplift),
+      margin_up: Number(marginUp),
+    };
+  });
+  const revMax = Math.max(...rows.map((row) => Number(row.rev_uplift) || 0), 1);
+  const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
+  const riskMax = Math.max(...rows.map((row) => Number(row.inv_risk_pct) || 0), 1);
+  const riskW8Max = Math.max(...rows.map((row) => Number(row.riskW8) || 0), 1);
+  const fmtMoneyNumber = (value) => value == null || Number.isNaN(Number(value)) ? "-" : Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const columns = [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
+    { key: "inv_risk_pct", label: "Inventory at risk W0", align: "num", render: fmtPct, cellClass: "riskCell", max: riskMax },
+    { key: "policyW8", label: "Policy W8" },
+    { key: "riskW8", label: "Inventory at risk W8", align: "num", render: fmtPct, cellClass: "riskCell", max: riskW8Max },
+    { key: "performanceW8", label: "W8 performance" },
+    { key: "recommendedAction", label: "Recommended action" },
+    { key: "final_price", label: "Price Week 9 (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtIndex },
+    { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
+    { key: "rev_uplift", label: "Revenue Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: revMax },
+    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
+  ];
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">Matrix keep-markdown actions</div>
+          <div className="panel__hint">Products where the Week 8 markdown is working as expected.</div>
+        </div>
+        <button className="btn btn--ghost btn--compact" type="button" onClick={onBack}>Back to Dashboard</button>
+      </div>
+      <div className="panel__body">
+        <DataTable rows={rows} columns={columns} onOpen={onOpen} />
+        <div className="footnote">{rows.length} products shown from the selected matrix transition.</div>
       </div>
     </section>
   );
@@ -1308,6 +1420,80 @@ function MatrixMarkupDetailPage({ onOpen, onBack }) {
       <div className="panel__body">
         <DataTable rows={rows} columns={columns} onOpen={onOpen} />
         <div className="footnote">{rows.length} product shown from Top Markups.</div>
+      </div>
+    </section>
+  );
+}
+
+function MatrixNewMarkupDetailPage({ onOpen, onBack }) {
+  const rows = `
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-0.45|8.0|18500|9200
+Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
+Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
+Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
+Lightweight Sports Hoodie|LH-66109|52.90|59.90|-11.7|8.0|None|Sell through +9pp vs expected|Increase price|Markup +11.3%|58.9|-1.7|8.0|19800|9800
+Performance Polo|PP-77465|39.90|44.90|-11.1|7.0|None|Sell through +7pp vs expected|Increase price|Markup +10.3%|43.9|-2.2|7.0|15000|7500
+Compression Shorts|CS-83920|29.90|34.90|-14.3|6.5|None|Sell through +8pp vs expected|Increase price|Markup +13.4%|33.9|-2.9|6.5|14200|7100
+Active Training T-Shirt|AT-93847|21.90|24.90|-12.0|7.5|None|Sell through +9pp vs expected|Increase price|Markup +13.7%|24.9|0.0|7.0|12000|6000
+High-Waist Leggings|HL-80426|44.90|49.90|-10.0|8.0|None|Sell through +8pp vs expected|Increase price|Markup +11.1%|49.9|0.0|8.0|17500|8800
+Thermal Sports Jacket|TJ-46813|66.90|74.90|-10.7|9.5|None|Sell through +11pp vs expected|Increase price|Markup +11.9%|74.9|0.0|9.0|26000|13000
+`.trim().split("\n").map((line) => {
+    const [name, sku, curr, comp, pctComp, riskW0, policyW8, performanceW8, recommendedAction, policyW9, finalPrice, finalPctComp, uplift, revUplift, marginUp] = line.split("|");
+    const exactActionMatch = policyW9.match(/([-+]?\d+(?:\.\d+)?)%/);
+    return {
+      name,
+      sku,
+      type: "markup",
+      curr: Number(curr),
+      comp: Number(comp),
+      pct_comp: Number(pctComp) / 100,
+      inv_risk_pct: Number(riskW0) / 100,
+      policyW8,
+      performanceW8,
+      recommendedAction,
+      policyW9,
+      reco: "Mark-up +10%",
+      exact_action_pct: exactActionMatch ? Number(exactActionMatch[1]) / 100 : null,
+      final_price: Number(finalPrice),
+      final_pct_comp: Number(finalPctComp) / 100,
+      uplift: Number(uplift) / 100,
+      rev_uplift: Number(revUplift),
+      margin_up: Number(marginUp),
+    };
+  });
+  const revMax = Math.max(...rows.map((row) => Number(row.rev_uplift) || 0), 1);
+  const marginMax = Math.max(...rows.map((row) => Number(row.margin_up) || 0), 1);
+  const riskMax = Math.max(...rows.map((row) => Number(row.inv_risk_pct) || 0), 1);
+  const fmtMoneyNumber = (value) => value == null || Number.isNaN(Number(value)) ? "-" : Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const columns = [
+    { key: "name", label: "Name" },
+    { key: "sku", label: "SKU" },
+    { key: "curr", label: "Initial (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "comp", label: "Competitor (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "pct_comp", label: "Price vs competitor", align: "num", render: fmtPct },
+    { key: "inv_risk_pct", label: "Inventory at risk", align: "num", render: fmtPct, cellClass: "riskCell", max: riskMax },
+    { key: "policyW8", label: "Policy W8" },
+    { key: "performanceW8", label: "W8 performance" },
+    { key: "recommendedAction", label: "Recommended action" },
+    { key: "policyW9", label: "Policy W9 (proposed)", render: (_, row) => <RecoChipForProduct product={row} /> },
+    { key: "final_price", label: "Price Week 9 (EUR)", align: "num", render: fmtMoneyNumber },
+    { key: "final_pct_comp", label: "Final vs competitor", align: "num", render: fmtIndex },
+    { key: "uplift", label: "Uplift", align: "num", render: fmtPct },
+    { key: "rev_uplift", label: "Revenue Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: revMax },
+    { key: "margin_up", label: "Margin Uplift (EUR)", align: "num", render: fmtEUR, cellClass: "upsideCell", max: marginMax },
+  ];
+  return (
+    <section className="panel">
+      <div className="panel__head panel__head--split">
+        <div>
+          <div className="panel__title">Matrix new markup actions</div>
+          <div className="panel__hint">Products moving from no current markup to a Week 9 markup recommendation.</div>
+        </div>
+        <button className="btn btn--ghost btn--compact" type="button" onClick={onBack}>Back to Dashboard</button>
+      </div>
+      <div className="panel__body">
+        <DataTable rows={rows} columns={columns} onOpen={onOpen} />
+        <div className="footnote">{rows.length} products shown from the selected matrix transition.</div>
       </div>
     </section>
   );
@@ -1498,6 +1684,7 @@ function enrichDetail(product, detailExtra) {
     curr_index_vs_comp: product.pct_comp,
     scenarioCurrent: detailExtra.scenarioCurrent,
     defaultScenario: detailExtra.defaultScenario,
+    currentDay: detailExtra.currentDay,
     series: detailExtra.series,
     scenarios: {},
   };
@@ -1538,6 +1725,7 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   const W = 980;
   const H = 360;
   const pad = { l: 38, r: 12, t: 14, b: 32 };
+  const currentDay = detail.currentDay ?? CURRENT_DAY;
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / 100) * (H - pad.t - pad.b);
   function makePath(field, includePoint) {
@@ -1555,16 +1743,16 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   }
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const yTicks = [0, 25, 50, 75, 100];
-  const pPre = makePath("cur", (point) => point.d <= CURRENT_DAY);
-  const pNoChange = makePath("cur", (point) => point.d >= CURRENT_DAY);
-  const pScenario = makePath(scenarioKey, (point) => point.d >= CURRENT_DAY);
+  const pPre = makePath("cur", (point) => point.d <= currentDay);
+  const pNoChange = makePath("cur", (point) => point.d >= currentDay);
+  const pScenario = makePath(scenarioKey, (point) => point.d >= currentDay);
 
   return (
     <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
       {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
-      <line x1={toX(CURRENT_DAY)} y1={pad.t} x2={toX(CURRENT_DAY)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
-      <text x={toX(CURRENT_DAY) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day {CURRENT_DAY}</text>
+      <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
+      <text x={toX(currentDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day {currentDay}</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {pPre && <path className="chartLineProductPre" d={pPre} />}
@@ -1576,6 +1764,7 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
 
 function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onBack }) {
   const detail = getDetailForProduct(selectedProduct);
+  const currentDay = detail.currentDay ?? CURRENT_DAY;
   const selectedKey = detail.scenarios[scenarioKey] ? scenarioKey : detail.defaultScenario;
   const scenario = detail.scenarios[selectedKey];
   const scenarioEntries = Object.entries(detail.scenarios);
@@ -1627,7 +1816,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
               <div className="detailCardBody">
                 <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioColor={selectedScenarioColor} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day {CURRENT_DAY}</div>
+                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day {currentDay}</div>
                   <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
                   <div className="legendItem"><span className="legendSwatch productScenario" style={{ "--scenario-color": selectedScenarioColor }} />{scenario.label}</div>
                 </div>
@@ -1647,7 +1836,10 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                       <tr>
                         <th>Metric</th>
                         <th className="num">Current</th>
-                        <th className="num is-selectedScenario" title={scenario.label}>{getCompactScenarioLabel(scenario.label)}</th>
+                        <th className="num is-selectedScenario" title={scenario.label}>
+                          <span className="scenarioHeaderBadge">Proposed policy</span>
+                          <span className="scenarioHeaderLabel">{getScenarioHeaderLabel(scenario.label)}</span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1679,32 +1871,40 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
   const currentDay = action.currentDay ?? CURRENT_DAY;
+  const isMarkdownScenarioChart = action.sku === "AT-93847";
   const fields = ["actual", "noAction", "noChange", scenarioField];
   const allValues = action.timeline.flatMap((point) => fields.map((field) => point[field]).filter((value) => value != null));
   const maxY = Math.max(100, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / maxY) * (H - pad.t - pad.b);
-  const makePath = (field) => action.timeline
-    .filter((point) => point[field] != null && !Number.isNaN(Number(point[field])))
+  const makePath = (field, includePoint = () => true) => action.timeline
+    .filter((point) => includePoint(point) && point[field] != null && !Number.isNaN(Number(point[field])))
     .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
     .join(" ");
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const yTicks = [0, 25, 50, 75, 100];
-  const paths = [
-    ["actual", "chartLineActual"],
-    ["noAction", "chartLineNoAction"],
-    ["noChange", "chartLineNoChange"],
-    [scenarioField, "chartLineRecommended"],
-  ].map(([field, className]) => [makePath(field), className]);
+  const paths = isMarkdownScenarioChart
+    ? [
+      [makePath("noAction", (point) => point.d <= action.appliedDay), "chartLineNoActionPre"],
+      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoAction"],
+      [makePath("noChange"), "chartLineNoChange"],
+      [makePath(scenarioField, (point) => point.d >= currentDay), "chartLineRecommended"],
+    ]
+    : [
+      [makePath("actual"), "chartLineActual"],
+      [makePath("noAction"), "chartLineNoAction"],
+      [makePath("noChange"), "chartLineNoChange"],
+      [makePath(scenarioField), "chartLineRecommended"],
+    ];
 
   return (
-    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
+    <svg className={`chartSvg ${isMarkdownScenarioChart ? "chartSvg--markdownScenario" : ""}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
       {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
       <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
       <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
-      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Today day {currentDay}</text>
+      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Week 9</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
@@ -1741,8 +1941,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
     { label: "Revenue uplift", current: fmtEURWhole(action.scenarioCurrent.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
     { label: "Margin uplift", current: fmtEURWhole(action.scenarioCurrent.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
   ] : [];
-  const currentPriceIndex = product?.pct_comp ?? (Number(product?.comp) ? (Number(action.oldPrice) - Number(product.comp)) / Number(product.comp) : null);
+  const currentPriceIndex = action.currentPriceIndex ?? product?.pct_comp ?? (Number(product?.comp) ? (Number(action.oldPrice) - Number(product.comp)) / Number(product.comp) : null);
   const detailElasticity = PRODUCT_DETAILS[product?.sku]?.elasticity || "High";
+  const incrementalMargin = hasScenarioComparison
+    ? Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0)
+    : null;
 
   return (
     <section className="panel">
@@ -1808,10 +2011,20 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
               <div className="detailCardBody">
                 <AppliedSalesChart action={action} scenarioField={selectedScenarioField} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch actual" />Observed until today</div>
-                  <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
-                  <div className="legendItem"><span className="legendSwatch noChange" />No further change forecast</div>
-                  {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch recommended" />{selectedScenario?.label || "Recommended action forecast"}</div>}
+                  {action.sku === "AT-93847" ? (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />Markdown -5.8%</div>
+                      {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -11.4% (Recommended policy)</div>}
+                    </>
+                  ) : (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch actual" />Observed until today</div>
+                      <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
+                      <div className="legendItem"><span className="legendSwatch noChange" />No further change forecast</div>
+                      {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch recommended" />{selectedScenario?.label || "Recommended action forecast"}</div>}
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -1831,7 +2044,10 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                           <tr>
                             <th>Metric</th>
                             <th className="num">Current</th>
-                            <th className="num is-selectedScenario">{getCompactScenarioLabel(selectedScenario.label)}</th>
+                            <th className="num is-selectedScenario">
+                              <span className="scenarioHeaderBadge">Proposed policy</span>
+                              <span className="scenarioHeaderLabel">{selectedScenario.label}</span>
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1845,9 +2061,15 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                         </tbody>
                       </table>
                     </div>
-                    <div className={`detailKpiRow scenarioKpiRow ${selectedScenario.margin_uplift < -30000 ? "scenarioKpiRow--bad" : selectedScenario.margin_uplift < -11000 ? "scenarioKpiRow--warn" : "scenarioKpiRow--good"}`}>
+                    {selectedScenario.incremental_revenue != null && (
+                      <div className="detailKpiRow scenarioKpiRow scenarioKpiRow--good">
+                        <div className="detailKpiLabel">Incremental revenue</div>
+                        <div className="detailKpiVal">{fmtEURWhole(selectedScenario.incremental_revenue)}</div>
+                      </div>
+                    )}
+                    <div className={`detailKpiRow scenarioKpiRow ${incrementalMargin < -30000 ? "scenarioKpiRow--bad" : incrementalMargin < 0 ? "scenarioKpiRow--warn" : "scenarioKpiRow--good"}`}>
                       <div className="detailKpiLabel">Incremental margin</div>
-                      <div className="detailKpiVal">{fmtEUR(selectedScenario.margin_uplift)}</div>
+                      <div className="detailKpiVal">{fmtEURWhole(incrementalMargin)}</div>
                     </div>
                   </>
                 ) : (
@@ -1855,10 +2077,12 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                     <tbody>{rows.map(([label, value]) => <tr key={label}><th>{label}</th><td className="num">{value}</td></tr>)}</tbody>
                   </table>
                 )}
-                <div className="insightBlock">
-                  <div className="insightBlock__label">Insight</div>
-                  <div className="insightBlock__text">{action.insight}</div>
-                </div>
+                {!hasScenarioComparison && (
+                  <div className="insightBlock">
+                    <div className="insightBlock__label">Insight</div>
+                    <div className="insightBlock__text">{action.insight}</div>
+                  </div>
+                )}
                 <div className="detailKpiRow">
                   <div className="detailKpiLabel">Recommended next move</div>
                   <div className="detailKpiVal">{action.nextAction}</div>
@@ -1915,7 +2139,7 @@ export default function App() {
   }
 
   function openMatrixDetail(type = "markdown") {
-    setActiveTab(type === "markup" ? "matrix-markup-detail" : "matrix-detail");
+    setActiveTab(type === "markup" ? "matrix-markup-detail" : type === "keepMarkdown" ? "matrix-keep-markdown-detail" : type === "newMarkup" ? "matrix-new-markup-detail" : "matrix-detail");
   }
 
   return (
@@ -1933,6 +2157,8 @@ export default function App() {
           {activeTab === "applied-markdown" && <AppliedActionsPage type="markdown" onOpenAppliedAction={openAppliedAction} />}
           {activeTab === "applied-markup" && <AppliedActionsPage type="markup" onOpenAppliedAction={openAppliedAction} />}
           {activeTab === "matrix-detail" && <MatrixDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
+          {activeTab === "matrix-keep-markdown-detail" && <MatrixKeepMarkdownDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
+          {activeTab === "matrix-new-markup-detail" && <MatrixNewMarkupDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
           {activeTab === "matrix-markup-detail" && <MatrixMarkupDetailPage onOpen={openProduct} onBack={() => setActiveTab("overview")} />}
           {activeTab === "detail" && selectedProduct && <ProductDetailPage selectedProduct={selectedProduct} scenarioKey={scenarioKey} onScenarioChange={setScenarioKey} onBack={() => setActiveTab("products")} />}
           {activeTab === "applied-detail" && selectedAppliedAction && <AppliedActionDetailPage selectedAction={selectedAppliedAction} onBack={() => setActiveTab(appliedBackTab)} />}
