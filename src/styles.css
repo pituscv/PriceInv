@@ -2649,20 +2649,25 @@ select {
   fill: none;
 }
 
+.chartSvg--markdownScenario .chartLineNoActionPre {
+  stroke: rgba(235, 96, 96, 0.96);
+  stroke-width: 3;
+}
+
 .chartSvg--markdownScenario .chartLineNoAction {
-  stroke: rgba(234, 242, 255, 0.4);
-  stroke-width: 2.2;
-  stroke-dasharray: 6 5;
+  stroke: rgba(235, 96, 96, 0.86);
+  stroke-width: 2.6;
+  stroke-dasharray: 8 5;
 }
 
 .chartSvg--markdownScenario .chartLineNoChange {
-  stroke: rgba(234, 242, 255, 0.82);
-  stroke-width: 3;
-  stroke-dasharray: none;
+  stroke: rgba(234, 242, 255, 0.9);
+  stroke-width: 2.8;
+  stroke-dasharray: 8 5;
 }
 
 .chartSvg--markdownScenario .chartLineRecommended {
-  stroke: rgba(66, 217, 200, 0.98);
+  stroke: rgba(75, 190, 120, 0.98);
   stroke-width: 3.1;
   stroke-dasharray: 8 5;
 }
@@ -2744,6 +2749,15 @@ select {
   background: rgba(234, 242, 255, 0.38);
 }
 
+.legendSwatch.noActionPre {
+  background: rgba(235, 96, 96, 0.96);
+}
+
+.legendSwatch.noActionForecast {
+  background: repeating-linear-gradient(90deg, rgba(235, 96, 96, 0.9) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(235, 96, 96, 0.26);
+}
+
 .legendSwatch.forecast,
 .legendSwatch.noChange {
   background: rgba(122, 162, 255, 0.95);
@@ -2754,12 +2768,13 @@ select {
 }
 
 .legendSwatch.markdownCurrent {
-  background: rgba(234, 242, 255, 0.82);
+  background: repeating-linear-gradient(90deg, rgba(234, 242, 255, 0.9) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(234, 242, 255, 0.24);
 }
 
 .legendSwatch.markdownRecommended {
-  background: repeating-linear-gradient(90deg, rgba(66, 217, 200, 0.98) 0 8px, transparent 8px 13px);
-  box-shadow: inset 0 0 0 1px rgba(66, 217, 200, 0.28);
+  background: repeating-linear-gradient(90deg, rgba(75, 190, 120, 0.98) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(75, 190, 120, 0.28);
 }
 
 .detailTbl {

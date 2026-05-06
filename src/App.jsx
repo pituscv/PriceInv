@@ -14,6 +14,7 @@ const recoPalette = {
 const scenarioColors = ["#42d9c8", "#9f7cff", "#f4b84a", "#ff7aa2"];
 const CATEGORY_OPTIONS = ["Clothing", "Footwear", "Accessories"];
 const CURRENT_DAY = 56;
+const NEXT_POLICY_DAY = 63;
 
 function getScenarioColor(index) {
   return scenarioColors[index % scenarioColors.length];
@@ -522,7 +523,6 @@ function TransitionMatrix({ onOpenCell }) {
       <div className="matrixLegend" aria-label="Transition matrix legend">
         <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--diagonal" />Aligned policy</div>
         <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--action" />Action required</div>
-        <div className="matrixLegend__item"><span className="matrixLegend__swatch matrixLegend__swatch--heat" />Darker cell means higher SKU count</div>
       </div>
     </>
   );
@@ -658,9 +658,9 @@ const WEEKLY_OVERVIEW_COLUMNS = [
 
 const WEEKLY_OVERVIEW_ROWS = [
   { label: "Forecast Revenue (EUR)", values: ["112,831,475", "111,900,000", "110,800,000", "109,900,000", "108,656,710", "109,200,000", "110,000,000", "110,600,000", "110,900,000", "111,139,003"] },
-  { label: "vs Plan", values: ["-", "931", "-2,031,475", "-2,931,475", "-4,174,765", "-3,631,475", "-2,831,475", "-2,231,475", "-1,931,475", "-1,692,472"], type: "variance" },
+  { label: "vs Plan", values: ["-", "931,475", "-2,031,475", "-2,931,475", "-4,174,765", "-3,631,475", "-2,831,475", "-2,231,475", "-1,931,475", "-1,692,472"], type: "variance" },
   { label: "Forecast Margin (EUR)", values: ["40,168,005", "39,900,000", "39,300,000", "39,000,000", "38,681,789", "38,950,000", "39,200,000", "39,350,000", "39,450,000", "39,565,485"] },
-  { label: "vs Plan", values: ["-", "268", "868", "-1,168,005", "-1,486,216", "-1,218,005", "-968", "-818", "-718", "-603"], type: "variance" },
+  { label: "vs Plan", values: ["-", "268,005", "868,005", "-1,168,005", "-1,486,216", "-1,218,005", "-968,005", "-818,005", "-718,005", "-602,520"], type: "variance" },
   { label: "Markdown Recommendation SKUs (#)", values: ["-", "917", "1,183", "1,322", "1,419", "1,771", "1,846", "1,913", "1,987", "2,132"], tone: "markdown" },
   { label: "Markup Recommendation SKUs (#)", values: ["-", "201", "263", "309", "334", "362", "377", "391", "403", "439"], tone: "markup" },
   { label: "Cumulative Sell-Through Rate", values: ["0%", "4%", "9%", "14%", "19%", "24%", "29%", "33%", "36%", "40%"], type: "rate" },
@@ -2085,25 +2085,63 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
   const W = 980;
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
-  const currentDay = action.currentDay ?? CURRENT_DAY;
   const isMarkdownScenarioChart = action.sku === "AT-93847";
+  const todayDay = CURRENT_DAY;
+  const policyStartDay = isMarkdownScenarioChart ? NEXT_POLICY_DAY : (action.currentDay ?? NEXT_POLICY_DAY);
   const fields = ["actual", "noAction", "noChange", scenarioField];
   const allValues = action.timeline.flatMap((point) => fields.map((field) => point[field]).filter((value) => value != null));
   const maxY = Math.max(100, Math.ceil(Math.max(...allValues, 1) / 25) * 25);
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / maxY) * (H - pad.t - pad.b);
-  const makePath = (field, includePoint = () => true) => action.timeline
-    .filter((point) => includePoint(point) && point[field] != null && !Number.isNaN(Number(point[field])))
+  const timeline = [...action.timeline].sort((a, b) => a.d - b.d);
+  const numericValue = (point, field) => {
+    const value = point?.[field];
+    return value == null || Number.isNaN(Number(value)) ? null : Number(value);
+  };
+  const interpolatePoint = (field, day, outputField = field) => {
+    const points = timeline.filter((point) => numericValue(point, field) != null);
+    const exact = points.find((point) => point.d === day);
+    if (exact) return { d: day, [outputField]: numericValue(exact, field) };
+    const before = [...points].reverse().find((point) => point.d < day);
+    const after = points.find((point) => point.d > day);
+    if (!before || !after) return null;
+    const beforeValue = numericValue(before, field);
+    const afterValue = numericValue(after, field);
+    const progress = (day - before.d) / (after.d - before.d);
+    return { d: day, [outputField]: beforeValue + (afterValue - beforeValue) * progress };
+  };
+  const pathFromPoints = (points, field) => points
+    .sort((a, b) => a.d - b.d)
     .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
     .join(" ");
+  const makePath = (field, includePoint = () => true) => timeline
+    .filter((point) => includePoint(point) && point[field] != null && !Number.isNaN(Number(point[field])))
+    .map((point) => ({ d: point.d, [field]: Number(point[field]) }))
+    .sort((a, b) => a.d - b.d)
+    .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
+    .join(" ");
+  const makeBoundedPath = (field, boundaryDay, side, boundarySourceField = field) => {
+    const points = timeline
+      .filter((point) => {
+        const value = numericValue(point, field);
+        if (value == null) return false;
+        return side === "before" ? point.d <= boundaryDay : point.d >= boundaryDay;
+      })
+      .map((point) => ({ d: point.d, [field]: numericValue(point, field) }));
+    const boundaryPoint = interpolatePoint(boundarySourceField, boundaryDay, field);
+    if (boundaryPoint && !points.some((point) => point.d === boundaryDay)) {
+      points.push(boundaryPoint);
+    }
+    return pathFromPoints(points, field);
+  };
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const yTicks = [0, 25, 50, 75, 100];
   const paths = isMarkdownScenarioChart
     ? [
-      [makePath("noAction", (point) => point.d <= action.appliedDay), "chartLineNoActionPre"],
-      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoAction"],
-      [makePath("noChange"), "chartLineNoChange"],
-      [makePath(scenarioField, (point) => point.d >= currentDay), "chartLineRecommended"],
+      [makeBoundedPath("noChange", policyStartDay, "before"), "chartLineNoActionPre"],
+      [makeBoundedPath("noChange", policyStartDay, "after"), "chartLineNoAction"],
+      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
+      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), "chartLineRecommended"],
     ]
     : [
       [makePath("actual"), "chartLineActual"],
@@ -2118,8 +2156,14 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
       {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
       <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
-      <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
-      <text x={toX(currentDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Week 9</text>
+      {isMarkdownScenarioChart && todayDay !== policyStartDay && (
+        <>
+          <line x1={toX(todayDay)} y1={pad.t} x2={toX(todayDay)} y2={H - pad.b} stroke="rgba(234,242,255,0.30)" strokeDasharray="3 3" />
+          <text x={toX(todayDay) - 4} y={pad.t + 29} textAnchor="end" fontSize="10" fill="rgba(234,242,255,0.62)" fontWeight="700">Today</text>
+        </>
+      )}
+      <line x1={toX(policyStartDay)} y1={pad.t} x2={toX(policyStartDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
+      <text x={toX(policyStartDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Week 9</text>
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
       {paths.map(([path, className]) => path ? <path className={className} d={path} key={className} /> : null)}
@@ -2228,8 +2272,9 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                 <div className="chartLegend">
                   {action.sku === "AT-93847" ? (
                     <>
-                      <div className="legendItem"><span className="legendSwatch noAction" />No-action counterfactual</div>
-                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />Markdown -5.8%</div>
+                      <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
+                      <div className="legendItem"><span className="legendSwatch noActionForecast" />Markdown -5.8% forecast</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />No-action forecast</div>
                       {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -11.4% (Recommended policy)</div>}
                     </>
                   ) : (
