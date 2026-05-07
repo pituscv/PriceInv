@@ -1278,7 +1278,7 @@ function parseMarkupPolicyRows(rawRows, source) {
 }
 
 const MATRIX_ADDITIONAL_MARKDOWN_PRODUCTS = parseMarkdownPolicyRows(`
-Active Training T-Shirt|AT-93847|22.47|20.9|7.5|20.0|Markdown -5.8%|12.0|Not enough|Additional markdown|Markdown -11.4%|19.9|-4.8|30.0|38200|12531
+Active Training T-Shirt|AT-93847|22.47|20.9|7.5|20.0|Markdown -5.8%|12.0|Not enough|Additional markdown|Markdown -11.4%|19.9|-4.8|30.0|38200|12540
 Sleeveless Training Top|ST-35780|24.54|22.9|7.2|14.0|Markdown -7.6%|9.5|Not enough|Additional markdown|Markdown -18.9%|19.9|-13.1|20.0|15300|5400
 Performance Running Shorts|RS-11234|35.47|31.9|11.2|18.0|Markdown -6.3%|11.5|Not enough|Additional markdown|Markdown -15.7%|29.9|-6.3|25.0|27100|9150
 Lightweight Hoodie|LH-22345|48.05|44.9|7.0|22.0|Markdown -5.4%|14.0|Not enough|Additional markdown|Markdown -12.8%|41.9|-6.7|28.0|44250|15100
@@ -1336,7 +1336,7 @@ Performance Joggers|PJ-31234|47.66|44.9|6.1|18.5|Markdown -10.2%|0.9|Working as 
 `, "Keep markdown");
 
 const MATRIX_NEW_MARKUP_PRODUCTS = parseMarkupPolicyRows(`
-Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|42000
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|12600
 Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
 Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
 Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
@@ -1456,7 +1456,7 @@ function RecommendationTableSection({ type, onOpen, title, hint, showCategory = 
 
 function MatrixDetailPage({ onOpen, onBack }) {
   const rows = [
-    { name: "Active Training T-Shirt", sku: "AT-93847", curr: 22.47, comp: 20.9, pct_comp: 0.075, inv_risk_pct: 0.2, policyW8: "Markdown -5.8%", riskW8: 0.12, performanceW8: "Not enough", reco: "Markdown -11.4%", exact_action_pct: -0.114, obsolete: 0, final_price: 19.9, final_pct_comp: -0.048, uplift: 0.3, rev_uplift: 38200, margin_up: 12531 },
+    { name: "Active Training T-Shirt", sku: "AT-93847", curr: 22.47, comp: 20.9, pct_comp: 0.075, inv_risk_pct: 0.2, policyW8: "Markdown -5.8%", riskW8: 0.12, performanceW8: "Not enough", reco: "Markdown -11.4%", exact_action_pct: -0.114, obsolete: 0, final_price: 19.9, final_pct_comp: -0.048, uplift: 0.3, rev_uplift: 38200, margin_up: 12540 },
     { name: "Sleeveless Training Top", sku: "ST-35780", curr: 24.54, comp: 22.9, pct_comp: 0.072, inv_risk_pct: 0.14, policyW8: "Markdown -7.6%", riskW8: 0.095, performanceW8: "Not enough", reco: "Markdown -18.9%", exact_action_pct: -0.189, obsolete: 0, final_price: 19.9, final_pct_comp: -0.131, uplift: 0.2, rev_uplift: 15300, margin_up: 5400 },
     { name: "Performance Running Shorts", sku: "RS-11234", curr: 35.47, comp: 31.9, pct_comp: 0.112, inv_risk_pct: 0.18, policyW8: "Markdown -6.3%", riskW8: 0.115, performanceW8: "Not enough", reco: "Markdown -15.7%", exact_action_pct: -0.157, obsolete: 0, final_price: 29.9, final_pct_comp: -0.063, uplift: 0.25, rev_uplift: 27100, margin_up: 9150 },
     { name: "Lightweight Hoodie", sku: "LH-22345", curr: 48.05, comp: 44.9, pct_comp: 0.07, inv_risk_pct: 0.22, policyW8: "Markdown -5.4%", riskW8: 0.14, performanceW8: "Not enough", reco: "Markdown -12.8%", exact_action_pct: -0.128, obsolete: 0, final_price: 41.9, final_pct_comp: -0.067, uplift: 0.28, rev_uplift: 44250, margin_up: 15100 },
@@ -1656,7 +1656,7 @@ function MatrixMarkupDetailPage({ onOpen, onBack }) {
 
 function MatrixNewMarkupDetailPage({ onOpen, onBack }) {
   const rows = `
-Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|42000
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|12600
 Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
 Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
 Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
@@ -2037,7 +2037,9 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   const yGridTicks = [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
   const pPre = isPolicyChart ? makeBoundedPath("cur", policyStartDay, "before") : makePath("cur", (point) => point.d <= currentDay);
   const pNoChange = isPolicyChart ? makeBoundedPath("cur", policyStartDay, "after") : makePath("cur", (point) => point.d >= currentDay);
-  const pScenario = isPolicyChart ? makePolicyScenarioPath(proposedScenarioKey) : makePath(scenarioKey, (point) => point.d >= currentDay);
+  const pScenario = isPolicyChart
+    ? selectedScenarioIsProposed ? makePolicyScenarioPath(scenarioKey) : ""
+    : makePath(scenarioKey, (point) => point.d >= currentDay);
   const pAlternative = isPolicyChart && !selectedScenarioIsProposed ? makePolicyScenarioPath(scenarioKey) : "";
 
   return (
@@ -2062,7 +2064,7 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
       {pPre && <path className={isPolicyChart ? "chartLineNoActionPre" : "chartLineProductPre"} d={pPre} />}
       {pNoChange && <path className={isPolicyChart ? "chartLineNoChange" : "chartLineProductNoChange"} d={pNoChange} />}
       {pScenario && <path className={isPolicyChart ? "chartLineRecommended" : "chartLineProductScenario is-active"} d={pScenario} style={isPolicyChart ? undefined : { "--scenario-color": scenarioColor }} />}
-      {pAlternative && <path className="chartLineScenarioAlternative" d={pAlternative} />}
+      {pAlternative && <path className={isPolicyChart ? "chartLineMarkupAlternative" : "chartLineScenarioAlternative"} d={pAlternative} />}
     </svg>
   );
 }
@@ -2077,10 +2079,12 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
   const isPolicyDetail = detail.chartVariant === "markupPolicy";
   const selectedScenarioIsProposed = scenario?.proposed !== false;
+  const scenarioBadge = selectedScenarioIsProposed ? "Proposed policy" : "";
   const selectedScenarioVisualColor = isPolicyDetail
     ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
     : selectedScenarioColor;
   const getRevenueUplift = (s) => s.revenue_uplift ?? (s.revenue != null && detail.scenarioCurrent.revenue != null ? Number(s.revenue) - Number(detail.scenarioCurrent.revenue) : null);
+  const baseScenarioLabel = detail.baseScenarioLabel || "Current";
   const incrementalMargin = Number(scenario.margin_uplift || 0) - Number(detail.scenarioCurrent.margin_uplift || 0);
   const rows = [
     { label: "Obsolete inventory units", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
@@ -2130,9 +2134,11 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                     <>
                       <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
                       <div className="legendItem"><span className="legendSwatch noActionForecast" />No-action forecast</div>
-                      <div className="legendItem"><span className="legendSwatch markdownRecommended" />Mark-up +15.4% (Proposed policy)</div>
+                      {selectedScenarioIsProposed && (
+                        <div className="legendItem"><span className="legendSwatch markdownRecommended" />Mark-up +15.4% (Proposed policy)</div>
+                      )}
                       {!selectedScenarioIsProposed && (
-                        <div className="legendItem"><span className="legendSwatch markdownAlternative" />{scenario.label}</div>
+                        <div className="legendItem"><span className="legendSwatch markdownCurrent" />{scenario.label}</div>
                       )}
                     </>
                   ) : (
@@ -2158,9 +2164,9 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                     <thead>
                       <tr>
                         <th>Metric</th>
-                        <th className="num">Current</th>
+                        <th className="num">{baseScenarioLabel}</th>
                         <th className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`} title={scenario.label}>
-                          {selectedScenarioIsProposed && <span className="scenarioHeaderBadge">Proposed policy</span>}
+                          <span className={`scenarioHeaderBadge ${scenarioBadge ? "" : "scenarioHeaderBadge--empty"}`}>{scenarioBadge || "Proposed policy"}</span>
                           <span className="scenarioHeaderLabel">{getScenarioHeaderLabel(scenario.label)}</span>
                         </th>
                       </tr>
@@ -2257,11 +2263,28 @@ function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsPr
     }
     return pathFromPoints(points, field);
   };
+  const makeSegmentPath = (field, startDay, endDay, startSourceField = field, endSourceField = field) => {
+    const points = timeline
+      .filter((point) => point.d >= startDay && point.d <= endDay && numericValue(point, field) != null)
+      .map((point) => ({ d: point.d, [field]: numericValue(point, field) }));
+    const startPoint = interpolatePoint(startSourceField, startDay, field);
+    const endPoint = interpolatePoint(endSourceField, endDay, field);
+    if (startPoint && !points.some((point) => point.d === startDay)) points.push(startPoint);
+    if (endPoint && !points.some((point) => point.d === endDay)) points.push(endPoint);
+    return pathFromPoints(points, field);
+  };
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
   const xGridTicks = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
   const yTicks = [0, 25, 50, 75, 100];
   const yGridTicks = [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
-  const paths = isKeepMarkdownPolicyChart
+  const paths = action.sku === "RS-11234"
+    ? [
+      [makeBoundedPath("noChange", action.appliedDay, "before"), "chartLineNoActionPre"],
+      [makeSegmentPath("noChange", action.appliedDay, policyStartDay), "chartLineNoAction"],
+      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
+      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), scenarioIsProposed ? "chartLineRecommended" : "chartLineScenarioAlternative"],
+    ]
+    : isKeepMarkdownPolicyChart
     ? [
       [makeBoundedPath("noChange", policyStartDay, "before"), "chartLineNoActionPre"],
       [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
@@ -2322,6 +2345,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
   const selectedScenarioField = selectedScenario?.field || "recommended";
   const selectedScenarioIsProposed = selectedScenario?.proposed !== false;
+  const selectedScenarioBadge = action.sku === "AT-93847" && selectedScenarioKey === "md58"
+    ? "Current policy"
+    : selectedScenarioIsProposed
+      ? "Proposed policy"
+      : "";
   const selectedScenarioVisualColor = action.chartVariant === "markdownPolicy"
     ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
     : selectedScenarioColor;
@@ -2339,7 +2367,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   ];
   const hasScenarioComparison = Boolean(action.scenarioCurrent && selectedScenario);
   const isKeepMarkdownPolicyDetail = action.chartVariant === "markdownPolicy";
-  const currentScenario = isKeepMarkdownPolicyDetail && action.scenarios?.keep ? action.scenarios.keep : action.scenarioCurrent;
+  const currentScenario = action.sku === "RS-11234"
+    ? action.scenarioCurrent
+    : isKeepMarkdownPolicyDetail && action.scenarios?.keep
+      ? action.scenarios.keep
+      : action.scenarioCurrent;
   const scenarioRows = hasScenarioComparison ? [
     { label: "Obsolete inventory units", current: fmtInt(currentScenario.inv_units), selected: fmtInt(selectedScenario.inv_units) },
     { label: "Obsolete inventory euros", current: fmtScenarioEUR(currentScenario.inv_eur), selected: fmtScenarioEUR(selectedScenario.inv_eur) },
@@ -2350,9 +2382,9 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   const detailElasticity = PRODUCT_DETAILS[product?.sku]?.elasticity || "High";
   const basePriceLabel = isKeepMarkdownPolicyDetail ? "Initial price" : "Current price";
   const basePriceVsCompetitorLabel = isKeepMarkdownPolicyDetail ? "Initial price vs competitor" : "Current price vs competitor";
-  const scenarioCurrentLabel = isKeepMarkdownPolicyDetail ? "Markdown -12.9%" : "Current";
+  const scenarioCurrentLabel = ["AT-93847", "RS-11234"].includes(action.sku) ? "NO MARKDOWN" : isKeepMarkdownPolicyDetail ? "Markdown -12.9%" : "Current";
   const incrementalMargin = hasScenarioComparison
-    ? (isKeepMarkdownPolicyDetail && selectedScenario.proposed ? Number(selectedScenario.margin_uplift || 0) : Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0))
+    ? Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0)
     : null;
 
   return (
@@ -2418,7 +2450,22 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
               <div className="detailCardBody">
                 <AppliedSalesChart action={action} scenarioField={selectedScenarioField} scenarioIsProposed={selectedScenarioIsProposed} />
                 <div className="chartLegend">
-                  {action.chartVariant === "markdownPolicy" ? (
+                  {action.sku === "RS-11234" ? (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
+                      <div className="legendItem"><span className="legendSwatch activeTrainingNoAction" />No-action forecast</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />Markdown -12.9%</div>
+                      {selectedScenarioIsProposed && (
+                        <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -12.9% (Proposed policy)</div>
+                      )}
+                      {!selectedScenarioIsProposed && hasRecommendedPath && (
+                        <div className="legendItem">
+                          <span className="legendSwatch markdownAlternative" />
+                          {selectedScenario?.label}
+                        </div>
+                      )}
+                    </>
+                  ) : action.chartVariant === "markdownPolicy" ? (
                     <>
                       <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
                       <div className="legendItem"><span className="legendSwatch noActionForecast" />No-action forecast</div>
@@ -2470,7 +2517,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                             <th>Metric</th>
                             <th className="num">{scenarioCurrentLabel}</th>
                             <th className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`}>
-                              {selectedScenarioIsProposed && <span className="scenarioHeaderBadge">Proposed policy</span>}
+                              <span className={`scenarioHeaderBadge ${selectedScenarioBadge === "Current policy" ? "scenarioHeaderBadge--current" : ""} ${selectedScenarioBadge ? "" : "scenarioHeaderBadge--empty"}`}>{selectedScenarioBadge || "Proposed policy"}</span>
                               <span className="scenarioHeaderLabel">{selectedScenario.label}</span>
                             </th>
                           </tr>

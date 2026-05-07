@@ -2692,6 +2692,13 @@ select {
   stroke-dasharray: 8 5;
 }
 
+.chartLineMarkupAlternative {
+  stroke: rgba(234, 242, 255, 0.9);
+  stroke-width: 1.95;
+  fill: none;
+  stroke-dasharray: 8 5;
+}
+
 .chartLegend {
   display: flex;
   gap: 12px;
@@ -2874,6 +2881,16 @@ select {
   letter-spacing: 0;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.scenarioHeaderBadge--current {
+  border-color: rgba(234, 242, 255, 0.18);
+  color: rgba(234, 242, 255, 0.78);
+  background: rgba(234, 242, 255, 0.07);
+}
+
+.scenarioHeaderBadge--empty {
+  visibility: hidden;
 }
 
 .scenarioHeaderLabel {
