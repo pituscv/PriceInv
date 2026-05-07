@@ -42,6 +42,16 @@ function getProductBySku(sku) {
   return ALL_PRODUCTS.find((product) => product.sku === sku);
 }
 
+function getActionProduct(action) {
+  return getProductBySku(action.sku) || {
+    sku: action.sku,
+    name: action.name || action.sku,
+    category: action.category || "-",
+    comp: action.competitorPrice,
+    pct_comp: action.currentPriceIndex,
+  };
+}
+
 function fmtSignedPct(x) {
   if (x == null || Number.isNaN(Number(x))) return "-";
   const sign = Number(x) >= 0 ? "+" : "";
@@ -1900,6 +1910,8 @@ function enrichDetail(product, detailExtra) {
     scenarioCurrent: detailExtra.scenarioCurrent,
     defaultScenario: detailExtra.defaultScenario,
     currentDay: detailExtra.currentDay,
+    policyStartDay: detailExtra.policyStartDay,
+    chartVariant: detailExtra.chartVariant,
     series: detailExtra.series,
     scenarios: {},
   };
@@ -1941,38 +1953,111 @@ function InventoryChart({ detail, scenarioKey, scenarioColor }) {
   const H = 360;
   const pad = { l: 38, r: 12, t: 14, b: 32 };
   const currentDay = detail.currentDay ?? CURRENT_DAY;
+  const policyStartDay = detail.policyStartDay ?? currentDay;
+  const isPolicyChart = detail.chartVariant === "markupPolicy";
+  const proposedScenarioKey = detail.defaultScenario;
+  const selectedScenario = detail.scenarios?.[scenarioKey];
+  const selectedScenarioIsProposed = selectedScenario?.proposed !== false;
   const toX = (day) => pad.l + (day / 180) * (W - pad.l - pad.r);
   const toY = (value) => pad.t + (1 - value / 100) * (H - pad.t - pad.b);
+  const series = [...detail.series].sort((a, b) => a.d - b.d);
+  const numericValue = (point, field) => {
+    const value = point?.[field];
+    return value == null || Number.isNaN(Number(value)) ? null : Number(value);
+  };
+  const interpolatePoint = (field, day, outputField = field) => {
+    const points = series.filter((point) => numericValue(point, field) != null);
+    const exact = points.find((point) => point.d === day);
+    if (exact) return { d: day, [outputField]: numericValue(exact, field) };
+    const before = [...points].reverse().find((point) => point.d < day);
+    const after = points.find((point) => point.d > day);
+    if (!before || !after) return null;
+    const beforeValue = numericValue(before, field);
+    const afterValue = numericValue(after, field);
+    const progress = (day - before.d) / (after.d - before.d);
+    return { d: day, [outputField]: beforeValue + (afterValue - beforeValue) * progress };
+  };
+  const trimAfterZero = (points, field) => {
+    const ordered = [...points].sort((a, b) => a.d - b.d);
+    const visible = [];
+    for (const point of ordered) {
+      visible.push(point);
+      if (Number(point[field]) <= 0) break;
+    }
+    return visible;
+  };
+  const pathFromPoints = (points, field) => trimAfterZero(points, field)
+    .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
+    .join(" ");
   function makePath(field, includePoint) {
     const points = [];
-    for (const point of detail.series) {
+    for (const point of series) {
       if (!includePoint(point)) continue;
       const value = point[field];
       if (value == null || Number.isNaN(Number(value))) continue;
-      points.push(point);
+      points.push({ d: point.d, [field]: Number(value) });
       if (Number(value) <= 0) break;
     }
-    return points
-      .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
-      .join(" ");
+    return pathFromPoints(points, field);
   }
+  const makeBoundedPath = (field, boundaryDay, side, boundarySourceField = field) => {
+    const points = series
+      .filter((point) => {
+        const value = numericValue(point, field);
+        if (value == null) return false;
+        return side === "before" ? point.d <= boundaryDay : point.d >= boundaryDay;
+      })
+      .map((point) => ({ d: point.d, [field]: numericValue(point, field) }));
+    const boundaryPoint = interpolatePoint(boundarySourceField, boundaryDay, field);
+    if (boundaryPoint && !points.some((point) => point.d === boundaryDay)) {
+      points.push(boundaryPoint);
+    }
+    return pathFromPoints(points, field);
+  };
+  const makePolicyScenarioPath = (field) => {
+    const points = [];
+    const policyPoint = interpolatePoint("cur", policyStartDay, field);
+    if (policyPoint) points.push(policyPoint);
+    series.forEach((point) => {
+      if (point.d > policyStartDay) {
+        const value = numericValue(point, field);
+        if (value != null) points.push({ d: point.d, [field]: value });
+      }
+    });
+    return pathFromPoints(points, field);
+  };
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
+  const xGridTicks = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
   const yTicks = [0, 25, 50, 75, 100];
-  const pPre = makePath("cur", (point) => point.d <= currentDay);
-  const pNoChange = makePath("cur", (point) => point.d >= currentDay);
-  const pScenario = makePath(scenarioKey, (point) => point.d >= currentDay);
+  const yGridTicks = [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+  const pPre = isPolicyChart ? makeBoundedPath("cur", policyStartDay, "before") : makePath("cur", (point) => point.d <= currentDay);
+  const pNoChange = isPolicyChart ? makeBoundedPath("cur", policyStartDay, "after") : makePath("cur", (point) => point.d >= currentDay);
+  const pScenario = isPolicyChart ? makePolicyScenarioPath(proposedScenarioKey) : makePath(scenarioKey, (point) => point.d >= currentDay);
+  const pAlternative = isPolicyChart && !selectedScenarioIsProposed ? makePolicyScenarioPath(scenarioKey) : "";
 
   return (
-    <svg className="chartSvg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
-      {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
-      {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
-      <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
-      <text x={toX(currentDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day {currentDay}</text>
+    <svg className={`chartSvg ${isPolicyChart ? "chartSvg--markdownScenario" : ""}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Inventory evolution">
+      {xGridTicks.map((x) => <line className={`chartGrid ${xTicks.includes(x) ? "" : "chartGrid--minor"}`} key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
+      {yGridTicks.map((y) => <line className={`chartGrid ${yTicks.includes(y) ? "" : "chartGrid--minor"}`} key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
+      {isPolicyChart ? (
+        <>
+          <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(234,242,255,0.30)" strokeDasharray="3 3" />
+          <text x={toX(currentDay) - 4} y={pad.t + 29} textAnchor="end" fontSize="10" fill="rgba(234,242,255,0.62)" fontWeight="700">Today</text>
+          <line x1={toX(policyStartDay)} y1={pad.t} x2={toX(policyStartDay)} y2={H - pad.b} stroke="rgba(66,217,200,0.38)" strokeDasharray="3 3" />
+          <text x={toX(policyStartDay) + 4} y={pad.t + 29} fontSize="10" fill="rgba(66,217,200,0.70)" fontWeight="700">Week 9</text>
+        </>
+      ) : (
+        <>
+          <line x1={toX(currentDay)} y1={pad.t} x2={toX(currentDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.20)" strokeDasharray="4 3" />
+          <text x={toX(currentDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.50)" fontWeight="700">Day {currentDay}</text>
+        </>
+      )}
       {yTicks.map((y) => <text className="chartAxisText" key={`yl-${y}`} x={pad.l - 8} y={toY(y) + 4} textAnchor="end">{y}%</text>)}
       {xTicks.map((x) => <text className="chartAxisText" key={`xl-${x}`} x={toX(x)} y={H - 8} textAnchor="middle">{x}</text>)}
-      {pPre && <path className="chartLineProductPre" d={pPre} />}
-      {pNoChange && <path className="chartLineProductNoChange" d={pNoChange} />}
-      {pScenario && <path className="chartLineProductScenario is-active" d={pScenario} style={{ "--scenario-color": scenarioColor }} />}
+      {pPre && <path className={isPolicyChart ? "chartLineNoActionPre" : "chartLineProductPre"} d={pPre} />}
+      {pNoChange && <path className={isPolicyChart ? "chartLineNoChange" : "chartLineProductNoChange"} d={pNoChange} />}
+      {pScenario && <path className={isPolicyChart ? "chartLineRecommended" : "chartLineProductScenario is-active"} d={pScenario} style={isPolicyChart ? undefined : { "--scenario-color": scenarioColor }} />}
+      {pAlternative && <path className="chartLineScenarioAlternative" d={pAlternative} />}
     </svg>
   );
 }
@@ -1985,6 +2070,11 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const scenarioEntries = Object.entries(detail.scenarios);
   const selectedScenarioIndex = Math.max(0, scenarioEntries.findIndex(([key]) => key === selectedKey));
   const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
+  const isPolicyDetail = detail.chartVariant === "markupPolicy";
+  const selectedScenarioIsProposed = scenario?.proposed !== false;
+  const selectedScenarioVisualColor = isPolicyDetail
+    ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
+    : selectedScenarioColor;
   const rows = [
     { label: "Obsolete inv. (units)", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
     { label: "Obsolete inv. (EUR)", current: fmtEURWhole(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtEURWhole(s.inv_eur) },
@@ -2022,18 +2112,31 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
               <div className="heroDivider" />
               <HeroStat label="Current price vs competitor" value={fmtIndex(detail.curr_index_vs_comp)} sub={`Competitor price: ${fmtEUR(detail.comp_price)}`} />
               <div className="heroDivider" />
-              <HeroStat label="Proposed price vs competitor" value={fmtIndex(scenario.proposed_index)} sub={`Proposed price: ${fmtEUR(scenario.price)}`} color={selectedScenarioColor} />
+              <HeroStat label={selectedScenarioIsProposed ? "Proposed price vs competitor" : "Scenario price vs competitor"} value={fmtIndex(scenario.proposed_index)} sub={`${selectedScenarioIsProposed ? "Proposed" : "Scenario"} price: ${fmtEUR(scenario.price)}`} color={selectedScenarioVisualColor} />
             </div>
           </div>
           <div className="detailGrid2">
             <div className="detailCard">
-              <div className="detailCardHead"><div className="detailCardTitle">Inventory Evolution <span className="muted">(% remaining, days 0-180)</span></div></div>
+              <div className="detailCardHead"><div className="detailCardTitle">Inventory Evolution</div></div>
               <div className="detailCardBody">
                 <InventoryChart detail={detail} scenarioKey={selectedKey} scenarioColor={selectedScenarioColor} />
                 <div className="chartLegend">
-                  <div className="legendItem"><span className="legendSwatch productPre" />Observed until day {currentDay}</div>
-                  <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
-                  <div className="legendItem"><span className="legendSwatch productScenario" style={{ "--scenario-color": selectedScenarioColor }} />{scenario.label}</div>
+                  {isPolicyDetail ? (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />Current scenario forecast</div>
+                      <div className="legendItem"><span className="legendSwatch markdownRecommended" />Mark-up +15.4% (Proposed policy)</div>
+                      {!selectedScenarioIsProposed && (
+                        <div className="legendItem"><span className="legendSwatch markdownAlternative" />{scenario.label}</div>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch productPre" />Observed until day {currentDay}</div>
+                      <div className="legendItem"><span className="legendSwatch productNoChange" />No-change forecast</div>
+                      <div className="legendItem"><span className="legendSwatch productScenario" style={{ "--scenario-color": selectedScenarioColor }} />{scenario.label}</div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -2051,8 +2154,8 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                       <tr>
                         <th>Metric</th>
                         <th className="num">Current</th>
-                        <th className="num is-selectedScenario" title={scenario.label}>
-                          <span className="scenarioHeaderBadge">Proposed policy</span>
+                        <th className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`} title={scenario.label}>
+                          {selectedScenarioIsProposed && <span className="scenarioHeaderBadge">Proposed policy</span>}
                           <span className="scenarioHeaderLabel">{getScenarioHeaderLabel(scenario.label)}</span>
                         </th>
                       </tr>
@@ -2062,7 +2165,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                         <tr key={row.label}>
                           <th>{row.label}</th>
                           <td className="num">{row.current}</td>
-                          <td className="num is-selectedScenario">{row.getValue(scenario)}</td>
+                          <td className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`}>{row.getValue(scenario)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -2072,6 +2175,12 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                   <div className="detailKpiLabel">Incremental margin</div>
                   <div className="detailKpiVal" style={{ color: scenario.margin_uplift >= 0 ? "var(--accent)" : "#FF7070" }}>{fmtEUR(scenario.margin_uplift)}</div>
                 </div>
+                {isPolicyDetail && (
+                  <div className="detailKpiRow">
+                    <div className="detailKpiLabel">Recommended next move</div>
+                    <div className="detailKpiVal">Mark-up +15.4%</div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -2081,11 +2190,12 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   );
 }
 
-function AppliedSalesChart({ action, scenarioField = "recommended" }) {
+function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsProposed = true }) {
   const W = 980;
   const H = 360;
   const pad = { l: 52, r: 16, t: 14, b: 32 };
-  const isMarkdownScenarioChart = action.sku === "AT-93847";
+  const isKeepMarkdownPolicyChart = action.chartVariant === "markdownPolicy";
+  const isMarkdownScenarioChart = action.sku === "AT-93847" || isKeepMarkdownPolicyChart;
   const todayDay = CURRENT_DAY;
   const policyStartDay = isMarkdownScenarioChart ? NEXT_POLICY_DAY : (action.currentDay ?? NEXT_POLICY_DAY);
   const fields = ["actual", "noAction", "noChange", scenarioField];
@@ -2110,16 +2220,24 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
     const progress = (day - before.d) / (after.d - before.d);
     return { d: day, [outputField]: beforeValue + (afterValue - beforeValue) * progress };
   };
-  const pathFromPoints = (points, field) => points
-    .sort((a, b) => a.d - b.d)
+  const trimAfterZero = (points, field) => {
+    const ordered = [...points].sort((a, b) => a.d - b.d);
+    const visible = [];
+    for (const point of ordered) {
+      visible.push(point);
+      if (Number(point[field]) <= 0) break;
+    }
+    return visible;
+  };
+  const pathFromPoints = (points, field) => trimAfterZero(points, field)
     .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
     .join(" ");
-  const makePath = (field, includePoint = () => true) => timeline
-    .filter((point) => includePoint(point) && point[field] != null && !Number.isNaN(Number(point[field])))
-    .map((point) => ({ d: point.d, [field]: Number(point[field]) }))
-    .sort((a, b) => a.d - b.d)
-    .map((point, index) => `${index ? "L" : "M"}${toX(point.d).toFixed(1)} ${toY(point[field]).toFixed(1)}`)
-    .join(" ");
+  const makePath = (field, includePoint = () => true) => pathFromPoints(
+    timeline
+      .filter((point) => includePoint(point) && point[field] != null && !Number.isNaN(Number(point[field])))
+      .map((point) => ({ d: point.d, [field]: Number(point[field]) })),
+    field
+  );
   const makeBoundedPath = (field, boundaryDay, side, boundarySourceField = field) => {
     const points = timeline
       .filter((point) => {
@@ -2135,13 +2253,24 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
     return pathFromPoints(points, field);
   };
   const xTicks = [0, 30, 60, 90, 120, 150, 180];
+  const xGridTicks = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
   const yTicks = [0, 25, 50, 75, 100];
-  const paths = isMarkdownScenarioChart
+  const yGridTicks = [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+  const paths = isKeepMarkdownPolicyChart
+    ? [
+      [makeBoundedPath("noChange", policyStartDay, "before"), "chartLineNoActionPre"],
+      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
+      [makeBoundedPath("recommended", policyStartDay, "after", "noChange"), "chartLineRecommended"],
+      ...(scenarioField !== "recommended"
+        ? [[makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), "chartLineScenarioAlternative"]]
+        : []),
+    ]
+    : isMarkdownScenarioChart
     ? [
       [makeBoundedPath("noChange", policyStartDay, "before"), "chartLineNoActionPre"],
       [makeBoundedPath("noChange", policyStartDay, "after"), "chartLineNoAction"],
       [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
-      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), "chartLineRecommended"],
+      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), scenarioIsProposed ? "chartLineRecommended" : "chartLineScenarioAlternative"],
     ]
     : [
       [makePath("actual"), "chartLineActual"],
@@ -2152,8 +2281,8 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
 
   return (
     <svg className={`chartSvg ${isMarkdownScenarioChart ? "chartSvg--markdownScenario" : ""}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
-      {xTicks.map((x) => <line className="chartGrid" key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
-      {yTicks.map((y) => <line className="chartGrid" key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
+      {xGridTicks.map((x) => <line className={`chartGrid ${xTicks.includes(x) ? "" : "chartGrid--minor"}`} key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
+      {yGridTicks.map((y) => <line className={`chartGrid ${yTicks.includes(y) ? "" : "chartGrid--minor"}`} key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
       <text x={toX(action.appliedDay) + 4} y={pad.t + 14} fontSize="10" fill="rgba(234,242,255,0.55)" fontWeight="700">Action day {action.appliedDay}</text>
       {isMarkdownScenarioChart && todayDay !== policyStartDay && (
@@ -2173,13 +2302,17 @@ function AppliedSalesChart({ action, scenarioField = "recommended" }) {
 
 function AppliedActionDetailPage({ selectedAction, onBack }) {
   const action = selectedAction;
-  const product = getProductBySku(action.sku);
+  const product = getActionProduct(action);
   const scenarioEntries = Object.entries(action.scenarios || {});
   const [selectedScenarioKey, setSelectedScenarioKey] = useState(action.defaultScenario || scenarioEntries[0]?.[0] || "");
   const selectedScenario = action.scenarios?.[selectedScenarioKey] || scenarioEntries[0]?.[1] || null;
   const selectedScenarioIndex = Math.max(0, scenarioEntries.findIndex(([key]) => key === selectedScenarioKey));
   const selectedScenarioColor = getScenarioColor(selectedScenarioIndex);
   const selectedScenarioField = selectedScenario?.field || "recommended";
+  const selectedScenarioIsProposed = selectedScenario?.proposed !== false;
+  const selectedScenarioVisualColor = action.chartVariant === "markdownPolicy"
+    ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
+    : selectedScenarioColor;
   const hasRecommendedPath = action.timeline.some((point) => point[selectedScenarioField] != null);
   const rows = [
     ["Rotation before", fmtPctFromMult(action.preRotation)],
@@ -2194,16 +2327,21 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   ];
   const hasScenarioComparison = Boolean(action.scenarioCurrent && selectedScenario);
   const fmtEURScenario = (value) => Number(value) === 0 ? "-" : fmtEURWhole(value);
+  const isKeepMarkdownPolicyDetail = action.chartVariant === "markdownPolicy";
+  const currentScenario = isKeepMarkdownPolicyDetail && action.scenarios?.keep ? action.scenarios.keep : action.scenarioCurrent;
   const scenarioRows = hasScenarioComparison ? [
-    { label: "Obsolete inventory units", current: fmtInt(action.scenarioCurrent.inv_units), selected: fmtInt(selectedScenario.inv_units) },
-    { label: "Obsolete inventory euros", current: fmtEURScenario(action.scenarioCurrent.inv_eur), selected: fmtEURScenario(selectedScenario.inv_eur) },
-    { label: "Revenue uplift", current: fmtEURWhole(action.scenarioCurrent.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
-    { label: "Margin uplift", current: fmtEURWhole(action.scenarioCurrent.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
+    { label: "Obsolete inventory units", current: fmtInt(currentScenario.inv_units), selected: fmtInt(selectedScenario.inv_units) },
+    { label: "Obsolete inventory euros", current: fmtEURScenario(currentScenario.inv_eur), selected: fmtEURScenario(selectedScenario.inv_eur) },
+    { label: "Revenue uplift", current: fmtEURWhole(currentScenario.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
+    { label: "Margin uplift", current: fmtEURWhole(currentScenario.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
   ] : [];
   const currentPriceIndex = action.currentPriceIndex ?? product?.pct_comp ?? (Number(product?.comp) ? (Number(action.oldPrice) - Number(product.comp)) / Number(product.comp) : null);
   const detailElasticity = PRODUCT_DETAILS[product?.sku]?.elasticity || "High";
+  const basePriceLabel = isKeepMarkdownPolicyDetail ? "Initial price" : "Current price";
+  const basePriceVsCompetitorLabel = isKeepMarkdownPolicyDetail ? "Initial price vs competitor" : "Current price vs competitor";
+  const scenarioCurrentLabel = isKeepMarkdownPolicyDetail ? "Markdown -12.9%" : "Current";
   const incrementalMargin = hasScenarioComparison
-    ? Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0)
+    ? (isKeepMarkdownPolicyDetail && selectedScenario.proposed ? Number(selectedScenario.margin_uplift || 0) : Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0))
     : null;
 
   return (
@@ -2211,7 +2349,6 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
       <div className="panel__head panel__head--split">
         <div>
           <div className="panel__title">Applied Action Detail</div>
-          <div className="panel__hint">Observed post-action performance and recommended next move.</div>
         </div>
         <button className="btn btn--ghost btn--compact" onClick={onBack}>Back to Overview</button>
       </div>
@@ -2243,11 +2380,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                 <>
                   <HeroStat label="Elasticity" value={detailElasticity} purple />
                   <div className="heroDivider" />
-                  <HeroStat label="SKU" value={action.sku} sub={`Current price: ${fmtEUR(action.oldPrice)}`} />
+                  <HeroStat label="SKU" value={action.sku} sub={`${basePriceLabel}: ${fmtEUR(action.oldPrice)}`} />
                   <div className="heroDivider" />
-                  <HeroStat label="Current price vs competitor" value={fmtIndex(currentPriceIndex)} sub={`Competitor price: ${fmtEUR(product?.comp)}`} />
+                  <HeroStat label={basePriceVsCompetitorLabel} value={fmtIndex(currentPriceIndex)} sub={`Competitor price: ${fmtEUR(product?.comp)}`} />
                   <div className="heroDivider" />
-                  <HeroStat label="Proposed price vs competitor" value={fmtIndex(selectedScenario.proposed_index)} sub={`Proposed price: ${fmtEUR(selectedScenario.price)}`} color={selectedScenarioColor} />
+                  <HeroStat label={selectedScenarioIsProposed ? "Proposed price vs competitor" : "Scenario price vs competitor"} value={fmtIndex(selectedScenario.proposed_index)} sub={`${selectedScenarioIsProposed ? "Proposed" : "Scenario"} price: ${fmtEUR(selectedScenario.price)}`} color={selectedScenarioVisualColor} />
                 </>
               ) : (
                 <>
@@ -2265,17 +2402,34 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
           <div className="detailGrid2">
             <div className="detailCard">
               <div className="detailCardHead">
-                <div className="detailCardTitle">Inventory Response <span className="muted">(% remaining, days 0-180)</span></div>
+                <div className="detailCardTitle">Inventory Response</div>
               </div>
               <div className="detailCardBody">
-                <AppliedSalesChart action={action} scenarioField={selectedScenarioField} />
+                <AppliedSalesChart action={action} scenarioField={selectedScenarioField} scenarioIsProposed={selectedScenarioIsProposed} />
                 <div className="chartLegend">
-                  {action.sku === "AT-93847" ? (
+                  {action.chartVariant === "markdownPolicy" ? (
                     <>
                       <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
-                      <div className="legendItem"><span className="legendSwatch noActionForecast" />Markdown -5.8% forecast</div>
                       <div className="legendItem"><span className="legendSwatch markdownCurrent" />No-action forecast</div>
-                      {hasRecommendedPath && <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -11.4% (Recommended policy)</div>}
+                      <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -12.9% (Proposed policy)</div>
+                      {!selectedScenarioIsProposed && hasRecommendedPath && (
+                        <div className="legendItem">
+                          <span className="legendSwatch markdownAlternative" />
+                          {selectedScenario?.label}
+                        </div>
+                      )}
+                    </>
+                  ) : action.sku === "AT-93847" ? (
+                    <>
+                      <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
+                      <div className="legendItem"><span className="legendSwatch noActionForecast" />{action.policyW8 || "Current markdown"} forecast</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />No-action forecast</div>
+                      {hasRecommendedPath && (
+                        <div className="legendItem">
+                          <span className={`legendSwatch ${selectedScenarioIsProposed ? "markdownRecommended" : "markdownAlternative"}`} />
+                          {selectedScenario?.label || action.nextAction}{selectedScenarioIsProposed ? " (Proposed policy)" : ""}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <>
@@ -2303,9 +2457,9 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                         <thead>
                           <tr>
                             <th>Metric</th>
-                            <th className="num">Current</th>
-                            <th className="num is-selectedScenario">
-                              <span className="scenarioHeaderBadge">Proposed policy</span>
+                            <th className="num">{scenarioCurrentLabel}</th>
+                            <th className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`}>
+                              {selectedScenarioIsProposed && <span className="scenarioHeaderBadge">Proposed policy</span>}
                               <span className="scenarioHeaderLabel">{selectedScenario.label}</span>
                             </th>
                           </tr>
@@ -2315,7 +2469,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                             <tr key={row.label}>
                               <th>{row.label}</th>
                               <td className="num">{row.current}</td>
-                              <td className="num is-selectedScenario">{row.selected}</td>
+                              <td className={`num is-selectedScenario ${selectedScenarioIsProposed ? "" : "is-alternativeScenario"}`}>{row.selected}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -2377,11 +2531,11 @@ export default function App() {
   const [scenarioKey, setScenarioKey] = useState("md10");
 
   function openProduct(product) {
-    if (product?.sku === "AT-93847") {
+    if (["AT-93847", "RS-11234"].includes(product?.sku)) {
       const appliedAction = APPLIED_ACTIONS.find((action) => action.sku === product.sku);
       if (appliedAction) {
         setSelectedAppliedAction(appliedAction);
-        setAppliedBackTab(activeTab === "matrix-detail" ? "matrix-detail" : "applied-actions");
+        setAppliedBackTab(activeTab?.startsWith("matrix-") ? activeTab : "applied-actions");
         setActiveTab("applied-detail");
         return;
       }
