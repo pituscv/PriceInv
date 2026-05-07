@@ -2660,13 +2660,13 @@ select {
 }
 
 .chartSvg--markdownScenario .chartLineNoAction {
-  stroke: rgba(235, 96, 96, 0.86);
+  stroke: rgba(234, 242, 255, 0.9);
   stroke-width: 1.9;
   stroke-dasharray: 8 5;
 }
 
 .chartSvg--markdownScenario .chartLineNoChange {
-  stroke: rgba(234, 242, 255, 0.9);
+  stroke: rgba(235, 96, 96, 0.92);
   stroke-width: 1.95;
   stroke-dasharray: 8 5;
 }
@@ -2675,6 +2675,14 @@ select {
   stroke: rgba(75, 190, 120, 0.98);
   stroke-width: 2.1;
   stroke-dasharray: 8 5;
+}
+
+.chartSvg--activeTraining .chartLineNoActionPre {
+  stroke: rgba(235, 96, 96, 0.96);
+}
+
+.chartSvg--activeTraining .chartLineNoChange {
+  stroke: rgba(235, 96, 96, 0.92);
 }
 
 .chartSvg--markdownScenario .chartLineScenarioAlternative {
@@ -2768,6 +2776,15 @@ select {
 .legendSwatch.noActionForecast {
   background: repeating-linear-gradient(90deg, rgba(235, 96, 96, 0.9) 0 8px, transparent 8px 13px);
   box-shadow: inset 0 0 0 1px rgba(235, 96, 96, 0.26);
+}
+
+.legendSwatch.activeTrainingActual {
+  background: rgba(235, 96, 96, 0.96);
+}
+
+.legendSwatch.activeTrainingNoAction {
+  background: repeating-linear-gradient(90deg, rgba(235, 96, 96, 0.92) 0 8px, transparent 8px 13px);
+  box-shadow: inset 0 0 0 1px rgba(235, 96, 96, 0.28);
 }
 
 .legendSwatch.forecast,

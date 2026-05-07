@@ -68,6 +68,10 @@ function fmtEURWhole(x) {
   });
 }
 
+function fmtScenarioEUR(x) {
+  return Number(x) === 0 ? "-" : fmtEURWhole(x);
+}
+
 function fmtCompactEUR(x) {
   if (x == null || Number.isNaN(Number(x))) return "-";
   return Number(x).toLocaleString("en-US", {
@@ -668,9 +672,9 @@ const WEEKLY_OVERVIEW_COLUMNS = [
 
 const WEEKLY_OVERVIEW_ROWS = [
   { label: "Forecast Revenue (EUR)", values: ["112,831,475", "111,900,000", "110,800,000", "109,900,000", "108,656,710", "109,200,000", "110,000,000", "110,600,000", "110,900,000", "111,139,003"] },
-  { label: "vs Plan", values: ["-", "931,475", "-2,031,475", "-2,931,475", "-4,174,765", "-3,631,475", "-2,831,475", "-2,231,475", "-1,931,475", "-1,692,472"], type: "variance" },
+  { label: "vs Plan", values: ["-", "-931,475", "-2,031,475", "-2,931,475", "-4,174,765", "-3,631,475", "-2,831,475", "-2,231,475", "-1,931,475", "-1,692,472"], type: "variance" },
   { label: "Forecast Margin (EUR)", values: ["40,168,005", "39,900,000", "39,300,000", "39,000,000", "38,681,789", "38,950,000", "39,200,000", "39,350,000", "39,450,000", "39,565,485"] },
-  { label: "vs Plan", values: ["-", "268,005", "868,005", "-1,168,005", "-1,486,216", "-1,218,005", "-968,005", "-818,005", "-718,005", "-602,520"], type: "variance" },
+  { label: "vs Plan", values: ["-", "-268,005", "-868,005", "-1,168,005", "-1,486,216", "-1,218,005", "-968,005", "-818,005", "-718,005", "-602,520"], type: "variance" },
   { label: "Markdown Recommendation SKUs (#)", values: ["-", "917", "1,183", "1,322", "1,419", "1,771", "1,846", "1,913", "1,987", "2,132"], tone: "markdown" },
   { label: "Markup Recommendation SKUs (#)", values: ["-", "201", "263", "309", "334", "362", "377", "391", "403", "439"], tone: "markup" },
   { label: "Cumulative Sell-Through Rate", values: ["0%", "4%", "9%", "14%", "19%", "24%", "29%", "33%", "36%", "40%"], type: "rate" },
@@ -2076,17 +2080,13 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const selectedScenarioVisualColor = isPolicyDetail
     ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
     : selectedScenarioColor;
-  const getRevenueUplift = (s) => s.revenue_uplift ?? (Number(s.revenue || 0) - Number(detail.scenarioCurrent.revenue || 0));
-  const hasSellthrough = detail.scenarioCurrent.sellthrough != null || scenarioEntries.some(([, entry]) => entry.sellthrough != null);
+  const getRevenueUplift = (s) => s.revenue_uplift ?? (s.revenue != null && detail.scenarioCurrent.revenue != null ? Number(s.revenue) - Number(detail.scenarioCurrent.revenue) : null);
+  const incrementalMargin = Number(scenario.margin_uplift || 0) - Number(detail.scenarioCurrent.margin_uplift || 0);
   const rows = [
-    { label: "Obsolete inv. (units)", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
-    { label: "Obsolete inv. (EUR)", current: fmtEURWhole(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtEURWhole(s.inv_eur) },
-    { label: "Revenue (EUR)", current: fmtEURWhole(detail.scenarioCurrent.revenue), getValue: (s) => fmtEURWhole(s.revenue) },
-    { label: "Revenue uplift", current: "-", getValue: (s) => fmtEURWhole(getRevenueUplift(s)) },
-    ...(hasSellthrough ? [{ label: "Sell-through", current: fmtPct(detail.scenarioCurrent.sellthrough), getValue: (s) => fmtPct(s.sellthrough) }] : []),
-    { label: "Cost (EUR)", current: fmtEURWhole(detail.scenarioCurrent.cost), getValue: (s) => fmtEURWhole(s.cost) },
-    { label: "Margin (EUR)", current: fmtEURWhole(detail.scenarioCurrent.margin), getValue: (s) => fmtEURWhole(s.margin) },
-    { label: "Margin uplift", current: "-", getValue: (s) => fmtEURWhole(s.margin_uplift) },
+    { label: "Obsolete inventory units", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
+    { label: "Obsolete inventory euros", current: fmtScenarioEUR(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtScenarioEUR(s.inv_eur) },
+    { label: "Revenue uplift", current: fmtEURWhole(detail.scenarioCurrent.revenue_uplift), getValue: (s) => fmtEURWhole(getRevenueUplift(s)) },
+    { label: "Margin uplift", current: fmtEURWhole(detail.scenarioCurrent.margin_uplift), getValue: (s) => fmtEURWhole(s.margin_uplift) },
   ];
 
   return (
@@ -2129,7 +2129,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                   {isPolicyDetail ? (
                     <>
                       <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
-                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />Current scenario forecast</div>
+                      <div className="legendItem"><span className="legendSwatch noActionForecast" />No-action forecast</div>
                       <div className="legendItem"><span className="legendSwatch markdownRecommended" />Mark-up +15.4% (Proposed policy)</div>
                       {!selectedScenarioIsProposed && (
                         <div className="legendItem"><span className="legendSwatch markdownAlternative" />{scenario.label}</div>
@@ -2176,9 +2176,9 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                     </tbody>
                   </table>
                 </div>
-                <div className="detailKpiRow">
-                  <div className="detailKpiLabel">Margin uplift</div>
-                  <div className="detailKpiVal" style={{ color: scenario.margin_uplift >= 0 ? "var(--accent)" : "#FF7070" }}>{fmtEURWhole(scenario.margin_uplift)}</div>
+                <div className={`detailKpiRow scenarioKpiRow ${incrementalMargin < -30000 ? "scenarioKpiRow--bad" : incrementalMargin < 0 ? "scenarioKpiRow--warn" : "scenarioKpiRow--good"}`}>
+                  <div className="detailKpiLabel">Incremental margin</div>
+                  <div className="detailKpiVal">{fmtEURWhole(incrementalMargin)}</div>
                 </div>
                 {isPolicyDetail && (
                   <div className="detailKpiRow">
@@ -2270,6 +2270,13 @@ function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsPr
         ? [[makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), "chartLineScenarioAlternative"]]
         : []),
     ]
+    : action.sku === "AT-93847"
+    ? [
+      [makeBoundedPath("noChange", action.appliedDay, "before"), "chartLineNoActionPre"],
+      [makeBoundedPath("noChange", action.appliedDay, "after"), "chartLineNoAction"],
+      [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
+      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), scenarioIsProposed ? "chartLineRecommended" : "chartLineScenarioAlternative"],
+    ]
     : isMarkdownScenarioChart
     ? [
       [makeBoundedPath("noChange", policyStartDay, "before"), "chartLineNoActionPre"],
@@ -2285,7 +2292,7 @@ function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsPr
     ];
 
   return (
-    <svg className={`chartSvg ${isMarkdownScenarioChart ? "chartSvg--markdownScenario" : ""}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
+    <svg className={`chartSvg ${isMarkdownScenarioChart ? "chartSvg--markdownScenario" : ""} ${action.sku === "AT-93847" ? "chartSvg--activeTraining" : ""}`} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="Applied action inventory chart">
       {xGridTicks.map((x) => <line className={`chartGrid ${xTicks.includes(x) ? "" : "chartGrid--minor"}`} key={`x-${x}`} x1={toX(x)} y1={pad.t} x2={toX(x)} y2={H - pad.b} />)}
       {yGridTicks.map((y) => <line className={`chartGrid ${yTicks.includes(y) ? "" : "chartGrid--minor"}`} key={`y-${y}`} x1={pad.l} y1={toY(y)} x2={W - pad.r} y2={toY(y)} />)}
       <line x1={toX(action.appliedDay)} y1={pad.t} x2={toX(action.appliedDay)} y2={H - pad.b} stroke="rgba(255,255,255,0.24)" strokeDasharray="4 3" />
@@ -2331,12 +2338,11 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
     ...(action.recommendedRotation != null ? [["Recommended rotation factor", fmtPctFromMult(action.recommendedRotation)]] : []),
   ];
   const hasScenarioComparison = Boolean(action.scenarioCurrent && selectedScenario);
-  const fmtEURScenario = (value) => Number(value) === 0 ? "-" : fmtEURWhole(value);
   const isKeepMarkdownPolicyDetail = action.chartVariant === "markdownPolicy";
   const currentScenario = isKeepMarkdownPolicyDetail && action.scenarios?.keep ? action.scenarios.keep : action.scenarioCurrent;
   const scenarioRows = hasScenarioComparison ? [
     { label: "Obsolete inventory units", current: fmtInt(currentScenario.inv_units), selected: fmtInt(selectedScenario.inv_units) },
-    { label: "Obsolete inventory euros", current: fmtEURScenario(currentScenario.inv_eur), selected: fmtEURScenario(selectedScenario.inv_eur) },
+    { label: "Obsolete inventory euros", current: fmtScenarioEUR(currentScenario.inv_eur), selected: fmtScenarioEUR(selectedScenario.inv_eur) },
     { label: "Revenue uplift", current: fmtEURWhole(currentScenario.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
     { label: "Margin uplift", current: fmtEURWhole(currentScenario.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
   ] : [];
@@ -2415,7 +2421,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                   {action.chartVariant === "markdownPolicy" ? (
                     <>
                       <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
-                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />No-action forecast</div>
+                      <div className="legendItem"><span className="legendSwatch noActionForecast" />No-action forecast</div>
                       <div className="legendItem"><span className="legendSwatch markdownRecommended" />Markdown -12.9% (Proposed policy)</div>
                       {!selectedScenarioIsProposed && hasRecommendedPath && (
                         <div className="legendItem">
@@ -2426,9 +2432,9 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                     </>
                   ) : action.sku === "AT-93847" ? (
                     <>
-                      <div className="legendItem"><span className="legendSwatch noActionPre" />Real inventory</div>
-                      <div className="legendItem"><span className="legendSwatch noActionForecast" />{action.policyW8 || "Current markdown"} forecast</div>
-                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />No-action forecast</div>
+                      <div className="legendItem"><span className="legendSwatch activeTrainingActual" />Real inventory</div>
+                      <div className="legendItem"><span className="legendSwatch activeTrainingNoAction" />No-action forecast</div>
+                      <div className="legendItem"><span className="legendSwatch markdownCurrent" />{(action.policyW8 || "Current markdown").replace(".", ",").replace("%", "")}</div>
                       {hasRecommendedPath && (
                         <div className="legendItem">
                           <span className={`legendSwatch ${selectedScenarioIsProposed ? "markdownRecommended" : "markdownAlternative"}`} />
