@@ -2923,6 +2923,10 @@ select {
   font-size: 18px;
 }
 
+.detailKpiVal--recommendedGreen {
+  color: #4bbe78;
+}
+
 .scenarioKpiRow {
   margin-top: 14px;
   padding: 12px 14px;

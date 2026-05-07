@@ -2089,8 +2089,8 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const rows = [
     { label: "Obsolete inventory units", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
     { label: "Obsolete inventory euros", current: fmtScenarioEUR(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtScenarioEUR(s.inv_eur) },
-    { label: "Revenue uplift", current: fmtEURWhole(detail.scenarioCurrent.revenue_uplift), getValue: (s) => fmtEURWhole(getRevenueUplift(s)) },
-    { label: "Margin uplift", current: fmtEURWhole(detail.scenarioCurrent.margin_uplift), getValue: (s) => fmtEURWhole(s.margin_uplift) },
+    { label: "Revenue", current: fmtEURWhole(detail.scenarioCurrent.revenue_uplift), getValue: (s) => fmtEURWhole(getRevenueUplift(s)) },
+    { label: "Margin", current: fmtEURWhole(detail.scenarioCurrent.margin_uplift), getValue: (s) => fmtEURWhole(s.margin_uplift) },
   ];
 
   return (
@@ -2189,7 +2189,7 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                 {isPolicyDetail && (
                   <div className="detailKpiRow">
                     <div className="detailKpiLabel">Recommended next move</div>
-                    <div className="detailKpiVal">Mark-up +15.4%</div>
+                    <div className="detailKpiVal detailKpiVal--recommendedGreen">Mark-up +15.4%</div>
                   </div>
                 )}
               </div>
@@ -2277,6 +2277,11 @@ function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsPr
   const xGridTicks = [0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180];
   const yTicks = [0, 25, 50, 75, 100];
   const yGridTicks = [0, 12.5, 25, 37.5, 50, 62.5, 75, 87.5, 100];
+  const activeTrainingScenarioLineClass = scenarioField === "noChange"
+    ? "chartLineNoAction"
+    : scenarioIsProposed
+      ? "chartLineRecommended"
+      : "chartLineScenarioAlternative";
   const paths = action.sku === "RS-11234"
     ? [
       [makeBoundedPath("noChange", action.appliedDay, "before"), "chartLineNoActionPre"],
@@ -2298,7 +2303,7 @@ function AppliedSalesChart({ action, scenarioField = "recommended", scenarioIsPr
       [makeBoundedPath("noChange", action.appliedDay, "before"), "chartLineNoActionPre"],
       [makeBoundedPath("noChange", action.appliedDay, "after"), "chartLineNoAction"],
       [makePath("noAction", (point) => point.d >= action.appliedDay), "chartLineNoChange"],
-      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), scenarioIsProposed ? "chartLineRecommended" : "chartLineScenarioAlternative"],
+      [makeBoundedPath(scenarioField, policyStartDay, "after", "noChange"), activeTrainingScenarioLineClass],
     ]
     : isMarkdownScenarioChart
     ? [
@@ -2375,8 +2380,8 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   const scenarioRows = hasScenarioComparison ? [
     { label: "Obsolete inventory units", current: fmtInt(currentScenario.inv_units), selected: fmtInt(selectedScenario.inv_units) },
     { label: "Obsolete inventory euros", current: fmtScenarioEUR(currentScenario.inv_eur), selected: fmtScenarioEUR(selectedScenario.inv_eur) },
-    { label: "Revenue uplift", current: fmtEURWhole(currentScenario.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
-    { label: "Margin uplift", current: fmtEURWhole(currentScenario.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
+    { label: "Revenue", current: fmtEURWhole(currentScenario.revenue_uplift), selected: fmtEURWhole(selectedScenario.revenue_uplift) },
+    { label: "Margin", current: fmtEURWhole(currentScenario.margin_uplift), selected: fmtEURWhole(selectedScenario.margin_uplift) },
   ] : [];
   const currentPriceIndex = action.currentPriceIndex ?? product?.pct_comp ?? (Number(product?.comp) ? (Number(action.oldPrice) - Number(product.comp)) / Number(product.comp) : null);
   const detailElasticity = PRODUCT_DETAILS[product?.sku]?.elasticity || "High";
@@ -2384,7 +2389,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
   const basePriceVsCompetitorLabel = isKeepMarkdownPolicyDetail ? "Initial price vs competitor" : "Current price vs competitor";
   const scenarioCurrentLabel = ["AT-93847", "RS-11234"].includes(action.sku) ? "NO MARKDOWN" : isKeepMarkdownPolicyDetail ? "Markdown -12.9%" : "Current";
   const incrementalMargin = hasScenarioComparison
-    ? Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0)
+    ? selectedScenario.incremental_margin ?? Number(selectedScenario.margin_uplift || 0) - Number(action.scenarioCurrent.margin_uplift || 0)
     : null;
 
   return (
@@ -2484,7 +2489,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                       <div className="legendItem"><span className="legendSwatch markdownCurrent" />{(action.policyW8 || "Current markdown").replace(".", ",").replace("%", "")}</div>
                       {hasRecommendedPath && (
                         <div className="legendItem">
-                          <span className={`legendSwatch ${selectedScenarioIsProposed ? "markdownRecommended" : "markdownAlternative"}`} />
+                          <span className={`legendSwatch ${selectedScenarioField === "noChange" ? "markdownCurrent" : selectedScenarioIsProposed ? "markdownRecommended" : "markdownAlternative"}`} />
                           {selectedScenario?.label || action.nextAction}{selectedScenarioIsProposed ? " (Proposed policy)" : ""}
                         </div>
                       )}
@@ -2551,7 +2556,7 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                 )}
                 <div className="detailKpiRow">
                   <div className="detailKpiLabel">Recommended next move</div>
-                  <div className="detailKpiVal">{action.nextAction}</div>
+                  <div className={`detailKpiVal ${["AT-93847", "RS-11234"].includes(action.sku) ? "detailKpiVal--recommendedGreen" : ""}`}>{action.nextAction}</div>
                 </div>
               </div>
             </div>
