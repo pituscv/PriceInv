@@ -1331,7 +1331,7 @@ Performance Joggers|PJ-31234|47.66|44.9|6.1|18.5|Markdown -10.2%|0.9|Working as 
 `, "Keep markdown");
 
 const MATRIX_NEW_MARKUP_PRODUCTS = parseMarkupPolicyRows(`
-Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-0.45|8.0|18500|9200
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|42000
 Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
 Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
 Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
@@ -1651,7 +1651,7 @@ function MatrixMarkupDetailPage({ onOpen, onBack }) {
 
 function MatrixNewMarkupDetailPage({ onOpen, onBack }) {
   const rows = `
-Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-0.45|8.0|18500|9200
+Athletic Track Pants|TP-92614|54.50|65.90|-17.3|8.0|None|Sell through +12pp vs expected|Increase price|Markup +15.4%|62.9|-4.6|8.0|42000|42000
 Basic Running Shoes|RS-71058|69.90|79.90|-12.5|9.0|None|Sell through +10pp vs expected|Increase price|Markup +10.0%|76.9|-3.8|9.0|24000|12000
 Performance Running Shorts|PR-57291|34.90|39.90|-12.5|7.5|None|Sell through +9pp vs expected|Increase price|Markup +11.5%|38.9|-2.5|7.0|13500|6800
 Windbreaker Jacket|WJ-64821|62.90|69.90|-10.0|8.5|None|Sell through +8pp vs expected|Increase price|Markup +9.5%|68.9|-1.4|8.0|21000|10500
@@ -2075,13 +2075,17 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
   const selectedScenarioVisualColor = isPolicyDetail
     ? (selectedScenarioIsProposed ? "#4bbe78" : "#eb6060")
     : selectedScenarioColor;
+  const getRevenueUplift = (s) => s.revenue_uplift ?? (Number(s.revenue || 0) - Number(detail.scenarioCurrent.revenue || 0));
+  const hasSellthrough = detail.scenarioCurrent.sellthrough != null || scenarioEntries.some(([, entry]) => entry.sellthrough != null);
   const rows = [
     { label: "Obsolete inv. (units)", current: fmtInt(detail.scenarioCurrent.inv_units), getValue: (s) => fmtInt(s.inv_units) },
     { label: "Obsolete inv. (EUR)", current: fmtEURWhole(detail.scenarioCurrent.inv_eur), getValue: (s) => fmtEURWhole(s.inv_eur) },
     { label: "Revenue (EUR)", current: fmtEURWhole(detail.scenarioCurrent.revenue), getValue: (s) => fmtEURWhole(s.revenue) },
+    { label: "Revenue uplift", current: "-", getValue: (s) => fmtEURWhole(getRevenueUplift(s)) },
+    ...(hasSellthrough ? [{ label: "Sell-through", current: fmtPct(detail.scenarioCurrent.sellthrough), getValue: (s) => fmtPct(s.sellthrough) }] : []),
     { label: "Cost (EUR)", current: fmtEURWhole(detail.scenarioCurrent.cost), getValue: (s) => fmtEURWhole(s.cost) },
     { label: "Margin (EUR)", current: fmtEURWhole(detail.scenarioCurrent.margin), getValue: (s) => fmtEURWhole(s.margin) },
-    { label: "Incremental margin", current: "-", getValue: (s) => fmtEURWhole(s.margin_uplift) },
+    { label: "Margin uplift", current: "-", getValue: (s) => fmtEURWhole(s.margin_uplift) },
   ];
 
   return (
@@ -2172,8 +2176,8 @@ function ProductDetailPage({ selectedProduct, scenarioKey, onScenarioChange, onB
                   </table>
                 </div>
                 <div className="detailKpiRow">
-                  <div className="detailKpiLabel">Incremental margin</div>
-                  <div className="detailKpiVal" style={{ color: scenario.margin_uplift >= 0 ? "var(--accent)" : "#FF7070" }}>{fmtEUR(scenario.margin_uplift)}</div>
+                  <div className="detailKpiLabel">Margin uplift</div>
+                  <div className="detailKpiVal" style={{ color: scenario.margin_uplift >= 0 ? "var(--accent)" : "#FF7070" }}>{fmtEURWhole(scenario.margin_uplift)}</div>
                 </div>
                 {isPolicyDetail && (
                   <div className="detailKpiRow">

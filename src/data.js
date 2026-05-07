@@ -30,7 +30,7 @@ export const MARKDOWN_LIST = [
 ];
 
 export const MARKUP_LIST = [
-  { sku: "TP-92614", name: "Athletic Track Pants", category: "Clothing", curr: 54.5, comp: 67.9, pct_comp: -0.198, rot: 1.77, reco: "Mark-up +20%", exact_action_pct: 0.21, final_price: 65.9, rev_uplift: 151668, margin_up: 151668 },
+  { sku: "TP-92614", name: "Athletic Track Pants", category: "Clothing", curr: 54.5, comp: 65.9, pct_comp: -0.173, rot: 1.77, reco: "Mark-up +20%", exact_action_pct: 0.154, final_price: 62.9, rev_uplift: 42000, margin_up: 42000 },
   { sku: "RS-71058", name: "Basic Running Shoes", category: "Footwear", curr: 88.9, comp: 98.9, pct_comp: -0.07, rot: 1.55, reco: "Mark-up +10%", exact_action_pct: 0.101, final_price: 97.9, rev_uplift: 29300, margin_up: 29300 },
   { sku: "PR-57291", name: "Performance Running Socks", category: "Accessories", curr: 32.9, comp: 39.9, pct_comp: -0.1, rot: 1.63, reco: "Mark-up +20%", exact_action_pct: 0.213, final_price: 39.9, rev_uplift: 24000, margin_up: 24000 },
   { sku: "WJ-64821", name: "Windbreaker Jacket", category: "Clothing", curr: 64.7, comp: 72.9, pct_comp: -0.11, rot: 1.57, reco: "Mark-up +10%", exact_action_pct: 0.111, final_price: 71.9, rev_uplift: 22400, margin_up: 22400 },
@@ -111,12 +111,12 @@ export const PRODUCT_DETAILS = {
     currentDay: 56,
     policyStartDay: 63,
     chartVariant: "markupPolicy",
-    scenarioCurrent: { inv_units: 0, inv_eur: 0, revenue: 74000, cost: 40700, margin: 33300 },
+    scenarioCurrent: { inv_units: 0, inv_eur: 0, revenue: 545000, sellthrough: 1, cost: 218000, margin: 327000 },
     defaultScenario: "mu154",
     scenarios: {
-      mu10: { label: "Mark-up +10%", price: 59.9, proposed: false, inv_units: 0, inv_eur: 0, revenue: 88500, cost: 48200, margin: 40300, margin_uplift: 7000, proposed_index: -0.118 },
-      mu154: { label: "Mark-up +15.4%", price: 62.9, proposed: true, inv_units: 0, inv_eur: 0, revenue: 92500, cost: 50000, margin: 42500, margin_uplift: 9200, proposed_index: -0.0045 },
-      mu30: { label: "Mark-up +30%", price: 70.9, proposed: false, inv_units: 150, inv_eur: 10635, revenue: 86000, cost: 44200, margin: 41800, margin_uplift: 8500, proposed_index: 0.074 },
+      mu10: { label: "Mark-up +10%", price: 60, proposed: false, inv_units: 0, inv_eur: 0, revenue: 572250, revenue_uplift: 27250, sellthrough: 1, cost: 218000, margin: 354250, margin_uplift: 27250, proposed_index: -0.09 },
+      mu154: { label: "Mark-up +15.4%", price: 62.9, proposed: true, inv_units: 0, inv_eur: 0, revenue: 587000, revenue_uplift: 42000, sellthrough: 1, cost: 218000, margin: 369000, margin_uplift: 42000, proposed_index: -0.046 },
+      mu30: { label: "Mark-up +30%", price: 70.9, proposed: false, inv_units: 430, inv_eur: 30520, revenue: 527560, revenue_uplift: -17440, sellthrough: 0.86, cost: 218000, margin: 309560, margin_uplift: -17440, proposed_index: 0.075 },
     },
     series: [
       { d: 0, cur: 100, mu10: 100, mu154: 100, mu30: 100 },
