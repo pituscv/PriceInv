@@ -2479,12 +2479,6 @@ function AppliedActionDetailPage({ selectedAction, onBack }) {
                         </tbody>
                       </table>
                     </div>
-                    {selectedScenario.incremental_revenue != null && (
-                      <div className="detailKpiRow scenarioKpiRow scenarioKpiRow--good">
-                        <div className="detailKpiLabel">Incremental revenue</div>
-                        <div className="detailKpiVal">{fmtEURWhole(selectedScenario.incremental_revenue)}</div>
-                      </div>
-                    )}
                     <div className={`detailKpiRow scenarioKpiRow ${incrementalMargin < -30000 ? "scenarioKpiRow--bad" : incrementalMargin < 0 ? "scenarioKpiRow--warn" : "scenarioKpiRow--good"}`}>
                       <div className="detailKpiLabel">Incremental margin</div>
                       <div className="detailKpiVal">{fmtEURWhole(incrementalMargin)}</div>
