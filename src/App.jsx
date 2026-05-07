@@ -943,7 +943,8 @@ function WeeklyValue({ value, type }) {
   const text = String(value);
   const isNegative = text.trim().startsWith("-");
   const isEmpty = text === "-";
-  return <span className={`weeklyValue ${isNegative ? "is-negative" : ""} ${!isNegative && !isEmpty && type === "variance" ? "is-positive" : ""}`}>{text}</span>;
+  const isVarianceDeviation = type === "variance" && !isEmpty;
+  return <span className={`weeklyValue ${isNegative || isVarianceDeviation ? "is-negative" : ""}`}>{text}</span>;
 }
 
 function WeeklyDashboardOverview() {
